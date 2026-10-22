@@ -8,7 +8,7 @@
 
 struct MaskSet {
 	// Squares that are empty or occupied by the opponent.
-	BitBoard cmt;
+	BitBoard targets;
 
 	// Pinmask.
 	BitBoard pinmask_dg = 0;
@@ -40,7 +40,7 @@ FORCE_INLINE BitBoard pawn_knight_checkers(Board& b, Square king_square) {
 template <bool white>
 FORCE_INLINE MaskSet& create_masks(Board& b, Square king_square, BitBoard checker, MaskSet& ret) {
 	ret.reset();
-	ret.cmt = ~b.get_player_occ<white>();
+	ret.targets = ~b.get_player_occ<white>();
 
 	BitBoard opp_board = b.get_player_occ<!white>();
 	BitBoard own_board = b.get_player_occ<white>();
@@ -49,7 +49,8 @@ FORCE_INLINE MaskSet& create_masks(Board& b, Square king_square, BitBoard checke
 	BitBoard er = b.get_piece_board<!white, ROOK>();
 	BitBoard diag_pinners =
 		(bishop_rays[king_square] & (eb | eq)) ? get_bishop_move(king_square, opp_board) & (eb | eq) : 0;
-	BitBoard orth_pinners = (rook_rays[king_square] & (er | eq)) ? get_rook_move(king_square, opp_board) & (er | eq) : 0;
+	BitBoard orth_pinners =
+		(rook_rays[king_square] & (er | eq)) ? get_rook_move(king_square, opp_board) & (er | eq) : 0;
 
 	if (checker) {
 		ret.check_mask |= checker;

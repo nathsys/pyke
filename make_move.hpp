@@ -241,5 +241,8 @@ static void move_from_string(const std::string& m, Position& p) {
 			p.set_ksq<false>(to);
 	}
 
+	p.cr &= castle_mask[from] & castle_mask[to];
 	p.white_turn = !white;
+	p.checker = white ? pawn_knight_checkers<false>(p.board, p.get_ksq<false>())
+					  : pawn_knight_checkers<true>(p.board, p.get_ksq<true>());
 }

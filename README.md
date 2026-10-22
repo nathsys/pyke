@@ -46,6 +46,8 @@ The output lists the node count for each root move (a "divide"), followed by the
 
 Perft from the start position matches the published numbers up to depth 9 (2,439,530,234,167 nodes). Further depths have not been tested.
 
+`make check` builds and runs the tests: perft 1 to 6 from the start position, plus 13 positions reached through move sequences that cover castling, en passant, pins and promotions.
+
 ## Limitations
 
-- There's no FEN input yet. The search always starts from the initial position, with any moves you pass played first. Castling rights are assumed to be intact after those moves, and en passant isn't available on the first move of the search.
+- There's no FEN input yet. The search always starts from the initial position, with any moves you pass played first.

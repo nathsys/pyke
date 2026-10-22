@@ -7,47 +7,49 @@
 
 #include "pyke.hpp"
 
-template <int depth>
-static uint64_t perft_internal(Position& pos) {
+template <int depth, bool print_move>
+static uint64_t count_root(Position& pos) {
+	BitBoard checker = pos.checker;
+	uint64_t nodes = pos.white_turn ? pyke::count_moves<true, depth, print_move>(pos)
+									: pyke::count_moves<false, depth, print_move>(pos);
+	pos.checker = checker;
+	return nodes;
+}
+
+template <bool print_move>
+static uint64_t count_nodes(Position& pos, int depth) {
+	switch (depth) {
+	case 1:
+		return count_root<1, print_move>(pos);
+	case 2:
+		return count_root<2, print_move>(pos);
+	case 3:
+		return count_root<3, print_move>(pos);
+	case 4:
+		return count_root<4, print_move>(pos);
+	case 5:
+		return count_root<5, print_move>(pos);
+	case 6:
+		return count_root<6, print_move>(pos);
+	case 7:
+		return count_root<7, print_move>(pos);
+	case 8:
+		return count_root<8, print_move>(pos);
+	case 9:
+		return count_root<9, print_move>(pos);
+	case 10:
+		return count_root<10, print_move>(pos);
+	default:
+		return 0;
+	}
+}
+
+static uint64_t perft(Position& pos, int depth) {
 	clock_t start = clock();
-	uint64_t nodes;
-
-	if (pos.white_turn)
-		nodes = pyke::count_moves<true, depth, true>(pos);
-	else
-		nodes = pyke::count_moves<false, depth, true>(pos);
-
+	uint64_t nodes = count_nodes<true>(pos, depth);
 	clock_t end = clock();
 	double seconds = double(end - start) / CLOCKS_PER_SEC;
 	std::cout << "\nNodes: " << nodes << "\nTime:  " << seconds << " s\n";
 	std::cout << "Speed: " << std::round(nodes / seconds / 1e4) / 100 << " MNPS\n";
 	return nodes;
-}
-
-static uint64_t perft(Position& pos, int depth) {
-	switch (depth) {
-	case 1:
-		return perft_internal<1>(pos);
-	case 2:
-		return perft_internal<2>(pos);
-	case 3:
-		return perft_internal<3>(pos);
-	case 4:
-		return perft_internal<4>(pos);
-	case 5:
-		return perft_internal<5>(pos);
-	case 6:
-		return perft_internal<6>(pos);
-	case 7:
-		return perft_internal<7>(pos);
-	case 8:
-		return perft_internal<8>(pos);
-	case 9:
-		return perft_internal<9>(pos);
-	case 10:
-		return perft_internal<10>(pos);
-	default:
-		std::cout << "Depth must be between 1 and 10.\n";
-		return 0;
-	}
 }

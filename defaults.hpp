@@ -6,8 +6,6 @@
 typedef uint8_t Square;
 typedef uint8_t Piece;
 typedef uint64_t BitBoard;
-typedef uint8_t Flag;
-typedef uint8_t Rank;
 typedef uint8_t File;
 typedef std::pair<Square, Square> sq_pair;
 typedef uint8_t CastlingRights;
@@ -26,24 +24,23 @@ constexpr uint64_t INIT_TOTAL_SQUARES = 0b11111111111111110000000000000000000000
 constexpr uint64_t INIT_WHITE_PIECES = 0b0000000000000000000000000000000000000000000000001111111111111111ULL;
 
 // Pieces.
-#define PAWN	   1
-#define KING	   2
-#define ROOK	   3
-#define BISHOP	   4
-#define KNIGHT	   5
-#define QUEEN	   6
-#define QUEEN_DIAG 7
-#define QUEEN_ORTH 8
-#define EMPTY	   0
+inline constexpr Piece EMPTY = 0;
+inline constexpr Piece PAWN = 1;
+inline constexpr Piece KING = 2;
+inline constexpr Piece ROOK = 3;
+inline constexpr Piece BISHOP = 4;
+inline constexpr Piece KNIGHT = 5;
+inline constexpr Piece QUEEN = 6;
+inline constexpr Piece QUEEN_DIAG = 7;
+inline constexpr Piece QUEEN_ORTH = 8;
 
-#define popcnt __builtin_popcountll
+inline constexpr int popcnt(uint64_t b) { return __builtin_popcountll(b); }
 
 #define FORCE_INLINE inline __attribute__((always_inline))
 #define NO_INLINE	 __attribute__((noinline))
 
 enum class PawnMoveType { ATTACKS, FORWARD, DOUBLE_FORWARD, NON_DOUBLE, ALL };
 
-inline constexpr BitBoard promotion_to_squares = (0b1111'1111ULL) | (0b1111'1111ULL << 56);
 inline constexpr BitBoard pawn_start_w = INIT_PAWN_SQUARES & INIT_WHITE_PIECES;
 inline constexpr BitBoard pawn_start_b = INIT_PAWN_SQUARES & INIT_BLACK_PIECES;
 inline constexpr BitBoard promotion_from_w = pawn_start_b;
@@ -55,13 +52,11 @@ inline constexpr uint8_t king_end_squares[4] = {62, 58, 6, 2};
 inline constexpr uint8_t rook_end_squares[4] = {61, 59, 5, 3};
 inline constexpr uint8_t queenside_middle_squares[2] = {1, 57};
 
-inline constexpr BitBoard no_edges = 0b0111'1110'0111'1110'0111'1110'0111'1110'0111'1110'0111'1110'0111'1110'0111'1110;
+inline constexpr CastlingRights bq_mask = 0b0001;
+inline constexpr CastlingRights bk_mask = 0b0010;
+inline constexpr CastlingRights wq_mask = 0b0100;
+inline constexpr CastlingRights wk_mask = 0b1000;
 
-#define bq_mask (0b0001)
-#define bk_mask (0b0010)
-#define wq_mask (0b0100)
-#define wk_mask (0b1000)
-
-#define can_capture_left(b)	 ((b) & 0x7F7F7F7F7F7F7F7FULL)
-#define can_capture_right(b) ((b) & 0xFEFEFEFEFEFEFEFEULL)
+inline constexpr BitBoard can_capture_left(BitBoard b) { return b & 0x7F7F7F7F7F7F7F7FULL; }
+inline constexpr BitBoard can_capture_right(BitBoard b) { return b & 0xFEFEFEFEFEFEFEFEULL; }
 

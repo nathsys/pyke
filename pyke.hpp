@@ -12,12 +12,12 @@
 
 namespace pyke {
 
-template <bool white, int dtg, bool print_move, bool ep = false>
+template <bool white, int depth, bool print_move, bool ep = false>
 NO_INLINE uint64_t count_moves(Position& pos);
 
-template <bool white, Piece p, int dtg>
+template <bool white, Piece p, int depth>
 static FORCE_INLINE void mark_check(Position& pos, Square to) {
-	if constexpr (dtg > 1 && (p == KNIGHT || p == PAWN)) {
+	if constexpr (depth > 1 && (p == KNIGHT || p == PAWN)) {
 		BitBoard to_mask = square_to_mask(to);
 		BitBoard attacks = p == KNIGHT
 			? get_knight_move(to)
@@ -26,11 +26,11 @@ static FORCE_INLINE void mark_check(Position& pos, Square to) {
 	}
 }
 
-template <bool white, int dtg>
+template <bool white, int depth>
 static FORCE_INLINE uint64_t count_with_rights(Position& pos, CastlingRights mask) {
 	CastlingRights cr = pos.cr;
 	pos.cr &= mask;
-	uint64_t ret = count_moves<!white, dtg - 1, false>(pos);
+	uint64_t ret = count_moves<!white, depth - 1, false>(pos);
 	pos.cr = cr;
 	return ret;
 }
@@ -40,14 +40,14 @@ static FORCE_INLINE uint64_t count_with_rights(Position& pos, CastlingRights mas
  */
 
 // Count rook moves.
-template <bool white, Piece p, bool capture, int dtg, bool print_move>
-static FORCE_INLINE uint64_t generate_rook_moves(BitBoard cmt, Square from, Position& pos) {
-	if (!cmt) return 0;
+template <bool white, Piece p, bool capture, int depth, bool print_move>
+static FORCE_INLINE uint64_t generate_rook_moves(BitBoard targets, Square from, Position& pos) {
+	if (!targets) return 0;
 	uint64_t ret = 0;
 
-	while (cmt) {
+	while (targets) {
 		uint64_t loc_ret = 0;
-		Square to = pop(cmt);
+		Square to = pop(targets);
 		BitBoard move = square_to_mask(from) | square_to_mask(to);
 		if constexpr (capture) {
 			// Capture moves.
@@ -55,11 +55,11 @@ static FORCE_INLINE uint64_t generate_rook_moves(BitBoard cmt, Square from, Posi
 			BitBoard to_mask = square_to_mask(to);
 
 			capture_move_wrapper<white, p>(pos.board, captured, move, to_mask);
-			loc_ret += count_with_rights<white, dtg>(pos, castle_mask[from] & castle_mask[to]);
+			loc_ret += count_with_rights<white, depth>(pos, castle_mask[from] & castle_mask[to]);
 			unmake_capture_wrapper<white, p>(pos.board, captured, move, to_mask);
 		} else {
 			plain_move<white, p>(pos.board, move);
-			loc_ret += count_with_rights<white, dtg>(pos, castle_mask[from]);
+			loc_ret += count_with_rights<white, depth>(pos, castle_mask[from]);
 			unmake_plain_move<white, p>(pos.board, move);
 		}
 		if constexpr (print_move) print_movecnt(from, to, loc_ret);
@@ -72,24 +72,24 @@ static FORCE_INLINE uint64_t generate_rook_moves(BitBoard cmt, Square from, Posi
  *	GENERAL
  */
 
-template <bool white, Piece p, int dtg, bool print_move>
-static FORCE_INLINE uint64_t count_captures(BitBoard cmt, Square from, Position& pos) {
-	if (!cmt) return 0;
+template <bool white, Piece p, int depth, bool print_move>
+static FORCE_INLINE uint64_t count_captures(BitBoard targets, Square from, Position& pos) {
+	if (!targets) return 0;
 	if constexpr (p == ROOK) {
-		return generate_rook_moves<white, ROOK, true, dtg, print_move>(cmt, from, pos);
+		return generate_rook_moves<white, ROOK, true, depth, print_move>(targets, from, pos);
 	} else {
 		uint64_t ret = 0;
-		while (cmt) {
+		while (targets) {
 			uint64_t loc_ret = 0;
-			Square to = pop(cmt);
+			Square to = pop(targets);
 			// Capture moves.
 			const Piece captured = pos.board.get_piece<!white>(to);
 			BitBoard move = square_to_mask(from) | square_to_mask(to);
 			BitBoard to_mask = square_to_mask(to);
 
 			capture_move_wrapper<white, p>(pos.board, captured, move, to_mask);
-			mark_check<white, p, dtg>(pos, to);
-			loc_ret += count_with_rights<white, dtg>(pos, castle_mask[to]);
+			mark_check<white, p, depth>(pos, to);
+			loc_ret += count_with_rights<white, depth>(pos, castle_mask[to]);
 			unmake_capture_wrapper<white, p>(pos.board, captured, move, to_mask);
 
 			if constexpr (print_move) print_movecnt(from, to, loc_ret);
@@ -99,21 +99,21 @@ static FORCE_INLINE uint64_t count_captures(BitBoard cmt, Square from, Position&
 	}
 }
 
-template <bool white, Piece p, int dtg, bool print_move>
-static FORCE_INLINE uint64_t count_plain(BitBoard cmt, Square from, Position& pos) {
-	if (!cmt) return 0;
+template <bool white, Piece p, int depth, bool print_move>
+static FORCE_INLINE uint64_t count_plain(BitBoard targets, Square from, Position& pos) {
+	if (!targets) return 0;
 	if constexpr (p == ROOK) {
-		return generate_rook_moves<white, ROOK, false, dtg, print_move>(cmt, from, pos);
+		return generate_rook_moves<white, ROOK, false, depth, print_move>(targets, from, pos);
 	} else {
 		uint64_t ret = 0;
-		while (cmt) {
+		while (targets) {
 			uint64_t loc_ret = 0;
-			Square to = pop(cmt);
+			Square to = pop(targets);
 			BitBoard move = square_to_mask(from) | square_to_mask(to);
 
 			plain_move<white, p>(pos.board, move);
-			mark_check<white, p, dtg>(pos, to);
-			loc_ret += count_moves<!white, dtg - 1, false>(pos);
+			mark_check<white, p, depth>(pos, to);
+			loc_ret += count_moves<!white, depth - 1, false>(pos);
 			unmake_plain_move<white, p>(pos.board, move);
 
 			if constexpr (print_move) print_movecnt(from, to, loc_ret);
@@ -124,23 +124,23 @@ static FORCE_INLINE uint64_t count_plain(BitBoard cmt, Square from, Position& po
 }
 
 // Splits the reachable squares into non-captures and captures and calls the appropriate function.
-template <bool white, Piece p, int dtg, bool print_move, MoveType mt = p>
-static FORCE_INLINE uint64_t generate_moves(BitBoard cmt, BitBoard pieces, Position& pos) {
-	if (!(cmt && pieces)) return 0;
+template <bool white, Piece p, int depth, bool print_move, MoveType mt = p>
+static FORCE_INLINE uint64_t generate_moves(BitBoard targets, BitBoard pieces, Position& pos) {
+	if (!(targets && pieces)) return 0;
 	uint64_t ret = 0;
 	// For all instances of given piece.
 	while (pieces) {
 		Square from = pop(pieces);
-		if constexpr (dtg <= 1 && !print_move) {
-			ret += popcnt(cmt & make_reach_board<white, p>(from, pos.board));
+		if constexpr (depth <= 1 && !print_move) {
+			ret += popcnt(targets & make_reach_board<white, p>(from, pos.board));
 		} else {
-			BitBoard piece_moves_to = cmt & make_reach_board<white, mt>(from, pos.board);
+			BitBoard piece_moves_to = targets & make_reach_board<white, mt>(from, pos.board);
 			BitBoard captures = piece_moves_to & pos.board.occ_board;
 			BitBoard non_captures = piece_moves_to & ~captures;
 
 			// Non-captures + captured.
-			ret += count_plain<white, p, dtg, print_move>(non_captures, from, pos);
-			ret += count_captures<white, p, dtg, print_move>(captures, from, pos);
+			ret += count_plain<white, p, depth, print_move>(non_captures, from, pos);
+			ret += count_captures<white, p, depth, print_move>(captures, from, pos);
 		}
 	}
 	return ret;
@@ -151,7 +151,7 @@ static FORCE_INLINE uint64_t generate_moves(BitBoard cmt, BitBoard pieces, Posit
  */
 
 // Create the castling move for given player and direction.
-template <bool white, bool kingside, int dtg, bool print_move>
+template <bool white, bool kingside, int depth, bool print_move>
 static FORCE_INLINE uint64_t generate_castle_move(Position& pos) {
 	Board& b = pos.board;
 	constexpr Square to = white ? (kingside ? 62 : 58) : (kingside ? 6 : 2);
@@ -166,13 +166,13 @@ static FORCE_INLINE uint64_t generate_castle_move(Position& pos) {
 		return 0;
 	} else if (pos.is_attacked<white>(middle_square) || pos.is_attacked<white>(to)) {
 		return 0;
-	} else if constexpr (dtg <= 1 && !print_move) {
+	} else if constexpr (depth <= 1 && !print_move) {
 		return 1;
 	} else {
 		constexpr uint8_t code = white ? (kingside ? 0 : 1) : (kingside ? 2 : 3);
 		castle_move<white, code>(pos.board);
 		pos.set_ksq<white>(to);
-		uint64_t ret = count_with_rights<white, dtg>(pos, castle_mask[ksq]);
+		uint64_t ret = count_with_rights<white, depth>(pos, castle_mask[ksq]);
 		unmake_castle_move<white, code>(pos.board);
 		pos.set_ksq<white>(ksq);
 		if constexpr (print_move) print_movecnt(ksq, to, ret);
@@ -181,12 +181,12 @@ static FORCE_INLINE uint64_t generate_castle_move(Position& pos) {
 }
 
 // Create king moves.
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE uint64_t generate_king_moves(BitBoard cmt, Position& pos) {
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE uint64_t generate_king_moves(BitBoard targets, Position& pos) {
 	Square ksq = pos.get_ksq<white>();
-	cmt &= get_king_move(ksq);
-	BitBoard captures = cmt & pos.board.get_player_occ<!white>();
-	BitBoard non_captures = cmt & ~captures;
+	targets &= get_king_move(ksq);
+	BitBoard captures = targets & pos.board.get_player_occ<!white>();
+	BitBoard non_captures = targets & ~captures;
 	uint64_t ret = 0;
 	while (non_captures) {
 		Square to = pop(non_captures);
@@ -195,7 +195,7 @@ static FORCE_INLINE uint64_t generate_king_moves(BitBoard cmt, Position& pos) {
 
 		plain_move<white, KING>(pos.board, move);
 		pos.set_ksq<white>(to);
-		if (!pos.is_attacked<white>(to)) loc_ret += count_with_rights<white, dtg>(pos, castle_mask[ksq]);
+		if (!pos.is_attacked<white>(to)) loc_ret += count_with_rights<white, depth>(pos, castle_mask[ksq]);
 		unmake_plain_move<white, KING>(pos.board, move);
 
 		if constexpr (print_move) print_movecnt(ksq, to, loc_ret);
@@ -211,7 +211,8 @@ static FORCE_INLINE uint64_t generate_king_moves(BitBoard cmt, Position& pos) {
 
 		capture_move_wrapper<white, KING>(pos.board, captured, move, to_mask);
 		pos.set_ksq<white>(to);
-		if (!pos.is_attacked<white>(to)) loc_ret += count_with_rights<white, dtg>(pos, castle_mask[ksq] & castle_mask[to]);
+		if (!pos.is_attacked<white>(to))
+			loc_ret += count_with_rights<white, depth>(pos, castle_mask[ksq] & castle_mask[to]);
 		unmake_capture_wrapper<white, KING>(pos.board, captured, move, to_mask);
 
 		if constexpr (print_move) print_movecnt(ksq, to, loc_ret);
@@ -228,7 +229,7 @@ static FORCE_INLINE uint64_t generate_king_moves(BitBoard cmt, Position& pos) {
  */
 
 // Make ep move and count. Offset is whether ep comes from left or right.
-template <bool white, int offset, int dtg, bool print_move>
+template <bool white, int offset, int depth, bool print_move>
 static FORCE_INLINE uint64_t make_en_passant(Position& pos, uint8_t ep) {
 	uint64_t loc_ret;
 	sq_pair epsq = get_ep_squares<white, offset>(ep);
@@ -238,8 +239,8 @@ static FORCE_INLINE uint64_t make_en_passant(Position& pos, uint8_t ep) {
 	ep_move<white>(pos.board, move, capture_sq);
 	loc_ret = 0;
 	if (!pos.is_attacked<white>(pos.get_ksq<white>())) {
-		mark_check<white, PAWN, dtg>(pos, epsq.second);
-		loc_ret = count_moves<!white, dtg - 1, false>(pos);
+		mark_check<white, PAWN, depth>(pos, epsq.second);
+		loc_ret = count_moves<!white, depth - 1, false>(pos);
 	}
 
 	unmake_ep_move<white>(pos.board, move, capture_sq);
@@ -249,29 +250,29 @@ static FORCE_INLINE uint64_t make_en_passant(Position& pos, uint8_t ep) {
 }
 
 // Count nodes following from ep moves.
-template <bool white, int dtg, bool print_move>
+template <bool white, int depth, bool print_move>
 static FORCE_INLINE uint64_t generate_ep_moves(Position& pos, uint8_t ep) {
-	return (ep & 0x80 ? make_en_passant<white, -1, dtg, print_move>(pos, ep) : 0)
-		+ (ep & 0x40 ? make_en_passant<white, 1, dtg, print_move>(pos, ep) : 0);
+	return (ep & 0x80 ? make_en_passant<white, -1, depth, print_move>(pos, ep) : 0)
+		+ (ep & 0x40 ? make_en_passant<white, 1, depth, print_move>(pos, ep) : 0);
 }
 
 // Pawn double pushes.
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE NodeCount generate_pawn_double(BitBoard cmt, Position& pos, BitBoard source) {
-	if constexpr (dtg <= 1 && !print_move) {
-		return popcnt(get_pawn_double<white>(source, pos.board.occ_board) & cmt);
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE NodeCount generate_pawn_double(BitBoard targets, Position& pos, BitBoard source) {
+	if constexpr (depth <= 1 && !print_move) {
+		return popcnt(get_pawn_double<white>(source, pos.board.occ_board) & targets);
 	} else {
 		NodeCount ret = 0;
 		while (source) {
 			BitBoard from = popextr(source);
-			BitBoard to_board = cmt & get_pawn_double<white>(from, pos.board.occ_board);
+			BitBoard to_board = targets & get_pawn_double<white>(from, pos.board.occ_board);
 			while (to_board) {
 				BitBoard to = popextr(to_board);
 				BitBoard move = from | to;
 				bool ep = pawn_double<white>(pos.board, move, to, pos.ep_flag);
-				mark_check<white, PAWN, dtg>(pos, lbit(to));
-				NodeCount loc_ret = ep ? count_moves<!white, dtg - 1, false, true>(pos)
-									   : count_moves<!white, dtg - 1, false, false>(pos);
+				mark_check<white, PAWN, depth>(pos, lbit(to));
+				NodeCount loc_ret = ep ? count_moves<!white, depth - 1, false, true>(pos)
+									   : count_moves<!white, depth - 1, false, false>(pos);
 				unmake_pawn_double<white>(pos.board, move);
 				if constexpr (print_move) print_movecnt(lbit(from), lbit(to), loc_ret);
 				ret += loc_ret;
@@ -282,33 +283,33 @@ static FORCE_INLINE NodeCount generate_pawn_double(BitBoard cmt, Position& pos, 
 }
 
 // Concrete generator for pawn moves. Creates double pushes, pushes and captures, in bulk if possible.
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE uint64_t generate_pawn_moves(BitBoard cmt, BitBoard pieces, Position& pos) {
-	if (!(cmt && pieces)) return 0;
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE uint64_t generate_pawn_moves(BitBoard targets, BitBoard pieces, Position& pos) {
+	if (!(targets && pieces)) return 0;
 	BitBoard occ = pos.board.occ_board;
-	BitBoard cmt_free = cmt & ~occ;
-	BitBoard cmt_captures = cmt & occ;
+	BitBoard targets_free = targets & ~occ;
+	BitBoard targets_captures = targets & occ;
 	BitBoard pawns_on_start = pieces & (white ? pawn_start_w : pawn_start_b);
-	uint64_t ret = generate_pawn_double<white, dtg, print_move>(cmt, pos, pawns_on_start);
+	uint64_t ret = generate_pawn_double<white, depth, print_move>(targets, pos, pawns_on_start);
 
 	// Generate moves in bulk.
-	if constexpr (dtg <= 1 && !print_move) {
-		ret += popcnt(get_pawn_forward<white>(pieces) & cmt_free);
-		ret += popcnt(get_pawn_left<white>(can_capture_left(pieces)) & cmt_captures);
-		ret += popcnt(get_pawn_right<white>(can_capture_right(pieces)) & cmt_captures);
+	if constexpr (depth <= 1 && !print_move) {
+		ret += popcnt(get_pawn_forward<white>(pieces) & targets_free);
+		ret += popcnt(get_pawn_left<white>(can_capture_left(pieces)) & targets_captures);
+		ret += popcnt(get_pawn_right<white>(can_capture_right(pieces)) & targets_captures);
 	} else {
 		while (pieces) {
 			Square from = pop(pieces);
-			BitBoard captures = get_pawn_move<white, PawnMoveType::ATTACKS>(from, occ) & cmt_captures;
-			BitBoard non_captures = get_pawn_move<white, PawnMoveType::FORWARD>(from, occ) & cmt_free;
-			ret += count_plain<white, PAWN, dtg, print_move>(non_captures, from, pos);
-			ret += count_captures<white, PAWN, dtg, print_move>(captures, from, pos);
+			BitBoard captures = get_pawn_move<white, PawnMoveType::ATTACKS>(from, occ) & targets_captures;
+			BitBoard non_captures = get_pawn_move<white, PawnMoveType::FORWARD>(from, occ) & targets_free;
+			ret += count_plain<white, PAWN, depth, print_move>(non_captures, from, pos);
+			ret += count_captures<white, PAWN, depth, print_move>(captures, from, pos);
 		}
 	}
 	return ret;
 }
 
-template <bool white, Piece promo, int dtg, bool print_move>
+template <bool white, Piece promo, int depth, bool print_move>
 static FORCE_INLINE uint64_t make_promotion(Position& pos, Square from, Square to) {
 	BitBoard to_mask = square_to_mask(to);
 	BitBoard move = square_to_mask(from) | to_mask;
@@ -319,9 +320,9 @@ static FORCE_INLINE uint64_t make_promotion(Position& pos, Square from, Square t
 	else
 		plain_move<white, PAWN>(pos.board, move);
 	toggle_promotion<white, promo>(pos.board, to_mask);
-	mark_check<white, promo, dtg>(pos, to);
+	mark_check<white, promo, depth>(pos, to);
 
-	uint64_t ret = count_with_rights<white, dtg>(pos, castle_mask[to]);
+	uint64_t ret = count_with_rights<white, depth>(pos, castle_mask[to]);
 
 	toggle_promotion<white, promo>(pos.board, to_mask);
 	if (captured != EMPTY)
@@ -333,30 +334,30 @@ static FORCE_INLINE uint64_t make_promotion(Position& pos, Square from, Square t
 	return ret;
 }
 
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE uint64_t generate_promotions(BitBoard cmt, BitBoard pieces, Position& pos) {
-	if (!(cmt && pieces)) return 0;
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE uint64_t generate_promotions(BitBoard targets, BitBoard pieces, Position& pos) {
+	if (!(targets && pieces)) return 0;
 	BitBoard occ = pos.board.occ_board;
-	BitBoard cmt_free = cmt & ~occ;
-	BitBoard cmt_captures = cmt & occ;
+	BitBoard targets_free = targets & ~occ;
+	BitBoard targets_captures = targets & occ;
 
-	if constexpr (dtg <= 1 && !print_move) {
+	if constexpr (depth <= 1 && !print_move) {
 		return 4
-			* (popcnt(get_pawn_forward<white>(pieces) & cmt_free)
-			   + popcnt(get_pawn_left<white>(can_capture_left(pieces)) & cmt_captures)
-			   + popcnt(get_pawn_right<white>(can_capture_right(pieces)) & cmt_captures));
+			* (popcnt(get_pawn_forward<white>(pieces) & targets_free)
+			   + popcnt(get_pawn_left<white>(can_capture_left(pieces)) & targets_captures)
+			   + popcnt(get_pawn_right<white>(can_capture_right(pieces)) & targets_captures));
 	} else {
 		uint64_t ret = 0;
 		while (pieces) {
 			Square from = pop(pieces);
-			BitBoard targets = (get_pawn_move<white, PawnMoveType::ATTACKS>(from, occ) & cmt_captures)
-				| (get_pawn_move<white, PawnMoveType::FORWARD>(from, occ) & cmt_free);
-			while (targets) {
-				Square to = pop(targets);
-				ret += make_promotion<white, QUEEN, dtg, print_move>(pos, from, to);
-				ret += make_promotion<white, ROOK, dtg, print_move>(pos, from, to);
-				ret += make_promotion<white, BISHOP, dtg, print_move>(pos, from, to);
-				ret += make_promotion<white, KNIGHT, dtg, print_move>(pos, from, to);
+			BitBoard to_squares = (get_pawn_move<white, PawnMoveType::ATTACKS>(from, occ) & targets_captures)
+				| (get_pawn_move<white, PawnMoveType::FORWARD>(from, occ) & targets_free);
+			while (to_squares) {
+				Square to = pop(to_squares);
+				ret += make_promotion<white, QUEEN, depth, print_move>(pos, from, to);
+				ret += make_promotion<white, ROOK, depth, print_move>(pos, from, to);
+				ret += make_promotion<white, BISHOP, depth, print_move>(pos, from, to);
+				ret += make_promotion<white, KNIGHT, depth, print_move>(pos, from, to);
 			}
 		}
 		return ret;
@@ -364,27 +365,29 @@ static FORCE_INLINE uint64_t generate_promotions(BitBoard cmt, BitBoard pieces, 
 }
 
 // Wrapper.
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE uint64_t generate_pawn(Position& pos, MaskSet& msk) {
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE uint64_t generate_pawn(Position& pos, MaskSet& masks) {
 	BitBoard can_move_from = pos.board.get_piece_board<white, PAWN>();
 	BitBoard pawns_on_promo = can_move_from & (white ? promotion_from_w : promotion_from_b);
 	can_move_from &= ~pawns_on_promo;
 	BitBoard occ = pos.board.occ_board;
-	BitBoard unpinned = can_move_from & msk.nopin;
-	BitBoard pinned = can_move_from & ~msk.nopin;
+	BitBoard unpinned = can_move_from & masks.nopin;
+	BitBoard pinned = can_move_from & ~masks.nopin;
 
 	// Unpinned + pinned.
-	uint64_t ret = generate_pawn_moves<white, dtg, print_move>(msk.cmt, unpinned, pos);
+	uint64_t ret = generate_pawn_moves<white, depth, print_move>(masks.targets, unpinned, pos);
 	if (pinned) {
-		ret += generate_pawn_moves<white, dtg, print_move>(msk.cmt & msk.pinmask_dg & occ, pinned & msk.pinmask_dg, pos)
-			+ generate_pawn_moves<white, dtg, print_move>(msk.cmt & msk.pinmask_orth & ~occ, pinned & msk.pinmask_orth, pos);
+		BitBoard dg_targets = masks.targets & masks.pinmask_dg & occ;
+		BitBoard orth_targets = masks.targets & masks.pinmask_orth & ~occ;
+		ret += generate_pawn_moves<white, depth, print_move>(dg_targets, pinned & masks.pinmask_dg, pos)
+			+ generate_pawn_moves<white, depth, print_move>(orth_targets, pinned & masks.pinmask_orth, pos);
 	}
 	if (pawns_on_promo) {
-		ret += generate_promotions<white, dtg, print_move>(msk.cmt, pawns_on_promo & msk.nopin, pos)
-			+ generate_promotions<white, dtg, print_move>(msk.cmt & msk.pinmask_dg & occ, pawns_on_promo & msk.pinmask_dg, pos)
-			+ generate_promotions<white, dtg, print_move>(
-				msk.cmt & msk.pinmask_orth & ~occ, pawns_on_promo & msk.pinmask_orth, pos
-			);
+		BitBoard dg_targets = masks.targets & masks.pinmask_dg & occ;
+		BitBoard orth_targets = masks.targets & masks.pinmask_orth & ~occ;
+		ret += generate_promotions<white, depth, print_move>(masks.targets, pawns_on_promo & masks.nopin, pos)
+			+ generate_promotions<white, depth, print_move>(dg_targets, pawns_on_promo & masks.pinmask_dg, pos)
+			+ generate_promotions<white, depth, print_move>(orth_targets, pawns_on_promo & masks.pinmask_orth, pos);
 	}
 	return ret;
 }
@@ -393,31 +396,31 @@ static FORCE_INLINE uint64_t generate_pawn(Position& pos, MaskSet& msk) {
  *	SLIDERS
  */
 
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE uint64_t generate_sliders(Position& pos, MaskSet& msk) {
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE uint64_t generate_sliders(Position& pos, MaskSet& masks) {
 	BitBoard bishops = pos.board.get_piece_board<white, BISHOP>();
 	BitBoard rooks = pos.board.get_piece_board<white, ROOK>();
 	BitBoard queens = pos.board.get_piece_board<white, QUEEN>();
-	BitBoard unp_b = bishops & msk.nopin;
-	BitBoard unp_r = rooks & msk.nopin;
-	BitBoard unp_q = queens & msk.nopin;
-	BitBoard pin_cmt_diag = msk.cmt & msk.pinmask_dg;
-	BitBoard pin_cmt_orth = msk.cmt & msk.pinmask_orth;
-	BitBoard dg_not_orth = msk.pinmask_dg & ~msk.pinmask_orth;
-	BitBoard orth_not_dg = msk.pinmask_orth & ~msk.pinmask_dg;
+	BitBoard unp_b = bishops & masks.nopin;
+	BitBoard unp_r = rooks & masks.nopin;
+	BitBoard unp_q = queens & masks.nopin;
+	BitBoard pin_targets_diag = masks.targets & masks.pinmask_dg;
+	BitBoard pin_targets_orth = masks.targets & masks.pinmask_orth;
+	BitBoard dg_not_orth = masks.pinmask_dg & ~masks.pinmask_orth;
+	BitBoard orth_not_dg = masks.pinmask_orth & ~masks.pinmask_dg;
 	BitBoard pin_b = bishops & dg_not_orth;
 	BitBoard pin_q_diag = queens & dg_not_orth;
 	BitBoard pin_r = rooks & orth_not_dg;
 	BitBoard pin_q_orth = queens & orth_not_dg;
 
 	// Pinned + unpinned.
-	return generate_moves<white, BISHOP, dtg, print_move>(pin_cmt_diag, pin_b, pos)
-		+ generate_moves<white, BISHOP, dtg, print_move>(msk.cmt, unp_b, pos)
-		+ generate_moves<white, QUEEN_DIAG, dtg, print_move>(pin_cmt_diag, pin_q_diag, pos)
-		+ generate_moves<white, QUEEN, dtg, print_move>(msk.cmt, unp_q, pos)
-		+ generate_moves<white, QUEEN_ORTH, dtg, print_move>(pin_cmt_orth, pin_q_orth, pos)
-		+ generate_moves<white, ROOK, dtg, print_move>(pin_cmt_orth, pin_r, pos)
-		+ generate_moves<white, ROOK, dtg, print_move>(msk.cmt, unp_r, pos);
+	return generate_moves<white, BISHOP, depth, print_move>(pin_targets_diag, pin_b, pos)
+		+ generate_moves<white, BISHOP, depth, print_move>(masks.targets, unp_b, pos)
+		+ generate_moves<white, QUEEN_DIAG, depth, print_move>(pin_targets_diag, pin_q_diag, pos)
+		+ generate_moves<white, QUEEN, depth, print_move>(masks.targets, unp_q, pos)
+		+ generate_moves<white, QUEEN_ORTH, depth, print_move>(pin_targets_orth, pin_q_orth, pos)
+		+ generate_moves<white, ROOK, depth, print_move>(pin_targets_orth, pin_r, pos)
+		+ generate_moves<white, ROOK, depth, print_move>(masks.targets, unp_r, pos);
 }
 
 /*
@@ -425,9 +428,10 @@ static FORCE_INLINE uint64_t generate_sliders(Position& pos, MaskSet& msk) {
  */
 
 // Count knight moves.
-template <bool white, int dtg, bool print_move>
-static FORCE_INLINE NodeCount generate_knight(Position& pos, MaskSet& msk) {
-	return generate_moves<white, KNIGHT, dtg, print_move>(msk.cmt, pos.piece_brd<white, KNIGHT>() & msk.nopin, pos);
+template <bool white, int depth, bool print_move>
+static FORCE_INLINE NodeCount generate_knight(Position& pos, MaskSet& masks) {
+	BitBoard knights = pos.piece_brd<white, KNIGHT>() & masks.nopin;
+	return generate_moves<white, KNIGHT, depth, print_move>(masks.targets, knights, pos);
 }
 
 /*
@@ -435,29 +439,29 @@ static FORCE_INLINE NodeCount generate_knight(Position& pos, MaskSet& msk) {
  */
 
 // Main counting function.
-template <bool white, int dtg, bool print_move, bool ep>
+template <bool white, int depth, bool print_move, bool ep>
 NO_INLINE uint64_t count_moves(Position& pos) {
-	if constexpr (dtg < 1)
+	if constexpr (depth < 1)
 		return 1;
 	else {
 		uint8_t ep_flag = ep ? pos.ep_flag : 0;
-		BitBoard checker = print_move ? pawn_knight_checkers<white>(pos.board, pos.get_ksq<white>()) : pos.checker;
+		BitBoard checker = pos.checker;
 		pos.checker = 0;
 
 		// Make masks.
-		MaskSet& msk = create_masks<white>(pos.board, pos.get_ksq<white>(), checker, pos.masks.go_next());
+		MaskSet& masks = create_masks<white>(pos.board, pos.get_ksq<white>(), checker, pos.masks.go_next());
 
 		// King moves can always be generated.
-		uint64_t ret = generate_king_moves<white, dtg, print_move>(msk.cmt, pos);
+		uint64_t ret = generate_king_moves<white, depth, print_move>(masks.targets, pos);
 
 		// If double check, only king can move. Else, limit the target squares to the checkmask and skip castling.
-		switch (msk.checkers) {
+		switch (masks.checkers) {
 		case 0:
-			ret += generate_castle_move<white, true, dtg, print_move>(pos);
-			ret += generate_castle_move<white, false, dtg, print_move>(pos);
+			ret += generate_castle_move<white, true, depth, print_move>(pos);
+			ret += generate_castle_move<white, false, depth, print_move>(pos);
 			break;
 		case 1:
-			msk.cmt &= msk.check_mask;
+			masks.targets &= masks.check_mask;
 			break;
 		default:
 			pos.masks.point_prev();
@@ -465,10 +469,10 @@ NO_INLINE uint64_t count_moves(Position& pos) {
 		}
 
 		// Generate moves.
-		ret += generate_sliders<white, dtg, print_move>(pos, msk);
-		ret += generate_pawn<white, dtg, print_move>(pos, msk);
-		ret += generate_knight<white, dtg, print_move>(pos, msk);
-		if constexpr (ep) ret += generate_ep_moves<white, dtg, print_move>(pos, ep_flag);
+		ret += generate_sliders<white, depth, print_move>(pos, masks);
+		ret += generate_pawn<white, depth, print_move>(pos, masks);
+		ret += generate_knight<white, depth, print_move>(pos, masks);
+		if constexpr (ep) ret += generate_ep_moves<white, depth, print_move>(pos, ep_flag);
 		pos.masks.point_prev();
 		return ret;
 	}

@@ -9,6 +9,10 @@ add_compile_options(-Ofast -funroll-loops -march=native)
 
 add_executable(pyke main.cpp board.cpp)
 
+add_executable(pyke_test EXCLUDE_FROM_ALL test.cpp board.cpp)
+target_compile_options(pyke_test PRIVATE -Wno-missing-profile)
+add_custom_target(check COMMAND pyke_test DEPENDS pyke_test)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Generate")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-generate")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")

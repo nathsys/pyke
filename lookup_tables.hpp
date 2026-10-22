@@ -147,40 +147,7 @@ constexpr uint64_t KNIGHT_MOVE_SQUARES[] = {
 	132096ULL
 };
 
-// rook magic numbers
-constexpr uint64_t rook_magic_numbers[64] = {
-	0x1004081002402ULL,	   0x2006104900a0804ULL,  0x12001008414402ULL,	 0x20030a0244872ULL,	0x4024081001000421ULL,
-	0x80c0084100102001ULL, 0x2100190040002085ULL, 0x280001040802101ULL,	 0x44440041009200ULL,	0x2935610830022400ULL,
-	0x20c020080040080ULL,  0x1001004080100ULL,	  0x2060820c0120200ULL,	 0x4008142004410100ULL, 0x40802000401080ULL,
-	0x101002200408200ULL,  0x2048440040820001ULL, 0x20020004010100ULL,	 0x202008004008002ULL,	0x2002080100110004ULL,
-	0x100021010009ULL,	   0x30200100110040ULL,	  0x1000422010034000ULL, 0x480400080088020ULL,	0x200046502000484ULL,
-	0x124080204001001ULL,  0x2080040080800200ULL, 0x14800401802800ULL,	 0x188020010100100ULL,	0x4200011004500ULL,
-	0x440003000200801ULL,  0x4040008040800020ULL, 0x80004600042881ULL,	 0x80088400100102ULL,	0x20080800400ULL,
-	0x2000a00200410ULL,	   0x20100080080080ULL,	  0x21200680100081ULL,	 0x2040002120081000ULL, 0x100400080208000ULL,
-	0x20008806104ULL,	   0x4010040010010802ULL, 0x8094004002004100ULL, 0x481828014002800ULL,	0x140848010000802ULL,
-	0x12108a0010204200ULL, 0x100808020004000ULL,  0x80044006422000ULL,	 0x801000060821100ULL,	0x2200800100020080ULL,
-	0x2802200800400ULL,	   0x208808088000400ULL,  0x120800800801000ULL,	 0x100802000801000ULL,	0x2024401000200040ULL,
-	0x800098204000ULL,	   0x2080088004402900ULL, 0x8480008002000100ULL, 0x3001c0002010008ULL,	0x200020010080420ULL,
-	0x100081001000420ULL,  0x2801880a0017001ULL,  0x140002000100040ULL,	 0x8a80104000800020ULL
-};
-
-// bishop magic numbers
-constexpr uint64_t bishop_magic_numbers[64] = {
-	0x4010011029020020ULL, 0x8918844842082200ULL, 0x6000020202d0240ULL,	 0x28000010020204ULL,	0x8040002811040900ULL,
-	0x500201010098b028ULL, 0x4a02012000ULL,		  0xa010109502200ULL,	 0x4010801011c04ULL,	0x5a84841004010310ULL,
-	0x20906061210001ULL,   0x802241102020002ULL,  0x300000261044000aULL, 0x4000020e01040044ULL, 0x180806108200800ULL,
-	0x500861011240000ULL,  0x8012020600211212ULL, 0x1a2208080504f080ULL, 0x201011000808101ULL,	0x90080104000041ULL,
-	0x1840060a44020800ULL, 0x110400a6080400ULL,	  0x400408a884001800ULL, 0x209188240001000ULL,	0x42008c0340209202ULL,
-	0x623000a080011400ULL, 0x2010004880111000ULL, 0x80020a0200100808ULL, 0x8646020080080080ULL, 0x2000402200300c08ULL,
-	0x8422100208500202ULL, 0x8004200962a00220ULL, 0x1c004001012080ULL,	 0xe4004081011002ULL,	0x800040400a011002ULL,
-	0x4001001021004000ULL, 0x20080002081110ULL,	  0x152048408022401ULL,	 0x2010100a02021202ULL, 0x220200865090201ULL,
-	0x8002020480840102ULL, 0xe900410884800ULL,	  0x810102c808880400ULL, 0x85040820080400ULL,	0x4002801a02003ULL,
-	0x810018200204102ULL,  0x404022024108200ULL,  0x400210c3880100ULL,	 0x801010402020200ULL,	0x401484104104005ULL,
-	0x4011002100800ULL,	   0x40308200402ULL,	  0x1020a0a020400ULL,	 0x24d0080801082102ULL, 0x21001420088ULL,
-	0x4050404440404ULL,	   0x3c0808410220200ULL,  0x1080820820060210ULL, 0x2112080446200010ULL, 0x581104180800210ULL,
-	0x108060845042010ULL,  0x10190041080202ULL,	  0x2004208a004208ULL,	 0x40040844404084ULL
-};
-// Create lookup tables for bisshops and rooks.
+// Create lookup tables for bishops and rooks.
 
 constexpr uint64_t make_bishop_mask(uint8_t square) {
 	square = 63 - square;
@@ -350,106 +317,6 @@ constexpr std::array<uint64_t, 64> make_rook_masks() {
 // Mask lookup table instances.
 constexpr std::array<uint64_t, 64> bishop_mask_table = make_bishop_masks();
 constexpr std::array<uint64_t, 64> rook_mask_table = make_rook_masks();
-
-// Max possible permutations for a mask.
-constexpr int max_permutations_rooks = 4096;
-constexpr int max_permutations_bishops = 512;
-
-// Create all mask permutations for blocker squares for rooks.
-constexpr std::array<uint64_t, max_permutations_rooks> create_all_rook_perms(uint64_t movement_mask) {
-	std::array<uint64_t, max_permutations_rooks> blocker_boards{};
-	std::array<int, 64> move_indices{};
-	int move_count = 0;
-
-	// Loop over all squares and check if piece has range here.
-	for (int square = 0; square < 64; ++square) {
-		// Check if square intersects with movement mask.
-		if ((movement_mask >> square) & 1) {
-			move_indices[move_count++] = square;
-		}
-	}
-
-	// Calculate the number of possible permutations.
-	int perm_amount = 1 << move_count;
-
-	// Create all possible blocker boards.
-	for (int perm_index = 0; perm_index < perm_amount; ++perm_index) {
-		uint64_t blocker_board = 0;
-		for (int bit_index = 0; bit_index < move_count; ++bit_index) {
-			int bit = (perm_index >> bit_index) & 1;
-			blocker_board |= static_cast<uint64_t>(bit) << move_indices[bit_index];
-		}
-		blocker_boards[perm_index] = blocker_board;
-	}
-
-	return blocker_boards;
-}
-
-// Create all mask permutations for blocker squares for bishops.
-constexpr std::array<uint64_t, max_permutations_bishops> create_all_bishop_perms(uint64_t movement_mask) {
-	std::array<uint64_t, max_permutations_bishops> blocker_boards{};
-	std::array<int, 64> move_indices{};
-	int move_count = 0;
-
-	// Loop over all squares and check if piece has range here.
-	for (int square = 0; square < 64; ++square) {
-		// Check if square intersects with movement mask.
-		if ((movement_mask >> square) & 1) {
-			move_indices[move_count++] = square;
-		}
-	}
-
-	// Calculate the number of possible permutations.
-	int perm_amount = 1 << move_count;
-
-	// Create all possible blocker boards.
-	for (int perm_index = 0; perm_index < perm_amount; ++perm_index) {
-		uint64_t blocker_board = 0;
-		for (int bit_index = 0; bit_index < move_count; ++bit_index) {
-			int bit = (perm_index >> bit_index) & 1;
-			blocker_board |= static_cast<uint64_t>(bit) << move_indices[bit_index];
-		}
-		blocker_boards[perm_index] = blocker_board;
-	}
-
-	return blocker_boards;
-}
-
-// Make lookup table for rooks.
-constexpr std::array<std::array<uint64_t, 4096>, 64> create_rook_attacks() {
-	std::array<std::array<uint64_t, 4096>, 64> values{};
-	for (int square = 0; square < 64; square++) {
-		uint64_t rook_mask = rook_mask_table[square];
-		int rook_relevant_bits = __builtin_popcountll(rook_mask);
-		auto rook_blocker_boards = create_all_rook_perms(rook_mask);
-		for (int board = 0; board < 4096; ++board) {
-			uint64_t blocker_board = rook_blocker_boards[board];
-			int index = (blocker_board * rook_magic_numbers[square]) >> (64 - rook_relevant_bits);
-			values[square][index] = rook_attack_on_fly(square, blocker_board);
-		}
-	}
-	return values;
-};
-
-// Make lookup table for bishops.
-constexpr std::array<std::array<uint64_t, 512>, 64> create_bishop_attacks() {
-	std::array<std::array<uint64_t, 512>, 64> values{};
-	for (int square = 0; square < 64; square++) {
-		uint64_t bishop_mask = bishop_mask_table[square];
-		int bishop_relevant_bits = __builtin_popcountll(bishop_mask);
-		auto bishop_blocker_boards = create_all_bishop_perms(bishop_mask);
-		for (int board = 0; board < 512; ++board) {
-			uint64_t blocker_board = bishop_blocker_boards[board];
-			int index = (blocker_board * bishop_magic_numbers[square]) >> (64 - bishop_relevant_bits);
-			values[square][index] = bishop_attack_on_fly(square, blocker_board);
-		}
-	}
-	return values;
-};
-
-// Table instances.
-static const std::array<std::array<uint64_t, 512>, 64> bishop_attacks = create_bishop_attacks();
-static const std::array<std::array<uint64_t, 4096>, 64> rook_attacks = create_rook_attacks();
 
 constexpr std::array<std::array<uint64_t, 64>, 2> make_pawn_edge_masks() {
 	std::array<std::array<uint64_t, 64>, 2> ret = {};
