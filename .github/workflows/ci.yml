@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [ g++, clang++ ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure + build
+        run: |
+          cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
+          cmake --build build --target pyke -j
+
+      - name: Perft smoke test (depth 6, known-correct node count)
+        run: |
+          RESULT=$(./build/pyke 6 | grep "Nodes:" | tr -dc '0-9')
+          EXPECTED=119060324
+          echo "Got $RESULT nodes, expected $EXPECTED"
+          [ "$RESULT" -eq "$EXPECTED" ]
+
+      - name: Test suite
+        run: cmake --build build --target check -j
+
+      - name: PGO build smoke test
+        if: matrix.compiler == 'g++'
+        run: |
+          cmake --build build --target release
+          RESULT=$(./build/pyke 7 | grep "Nodes:" | tr -dc '0-9')
+          EXPECTED=3195901860
+          echo "Got $RESULT nodes, expected $EXPECTED"
+          [ "$RESULT" -eq "$EXPECTED" ]

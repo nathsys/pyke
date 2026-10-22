@@ -1,5 +1,7 @@
 # Pyke
 
+[![CI](https://github.com/nathsys/pyke/actions/workflows/ci.yml/badge.svg)](https://github.com/nathsys/pyke/actions/workflows/ci.yml)
+
 Pyke is a chess move generator written in C++20. It's built for [perft](https://www.chessprogramming.org/Perft), which means counting every legal position reachable from a starting position up to a given depth. It's single-threaded, and almost all of the work happens at compile time.
 
 On a Ryzen 9 7900X it counts perft 7 from the start position (3,195,901,860 nodes) in about 1.7 seconds, which works out to roughly 1.9 billion nodes per second. Perft 8 (84,998,978,956 nodes) takes about 47 seconds.

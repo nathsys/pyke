@@ -5,20 +5,27 @@ project(Pyke CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-Ofast -funroll-loops -march=native)
+add_compile_options(-march=native)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+	add_compile_options(-g -O0)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	add_compile_options(-Ofast -funroll-loops)
+else()
+	add_compile_options(-O3 -funroll-loops)
+endif()
 
 add_executable(pyke main.cpp board.cpp)
 
 add_executable(pyke_test EXCLUDE_FROM_ALL test.cpp board.cpp)
-target_compile_options(pyke_test PRIVATE -Wno-missing-profile)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	target_compile_options(pyke_test PRIVATE -Wno-missing-profile)
+endif()
 add_custom_target(check COMMAND pyke_test DEPENDS pyke_test)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Generate")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-generate")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-use")
-elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
 endif()
 
 add_custom_target(generate
