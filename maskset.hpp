@@ -1,14 +1,13 @@
+#pragma once
+
 #include <cstdint>
 
 #include "board.hpp"
 #include "defaults.hpp"
 #include "piece_moves.hpp"
 
-#ifndef MASKSET_H
-#define MASKSET_H
-
 struct MaskSet {
-	// squares that are empty or enemy;
+	// Squares that are empty or occupied by the opponent.
 	BitBoard cmt;
 
 	// Pinmask.
@@ -18,8 +17,6 @@ struct MaskSet {
 	BitBoard nopin = 0;
 
 	uint8_t checkers = 0;
-
-	inline uint8_t get_check_cnt() { return checkers; }
 
 	inline void reset() {
 		pinmask_dg = 0;
@@ -31,7 +28,17 @@ struct MaskSet {
 
 // Create all the needed masks for the current position.
 template <bool white>
-MaskSet& create_masks(Board& b, Square king_square, MaskSet& ret) {
+FORCE_INLINE BitBoard pawn_knight_checkers(Board& b, Square king_square) {
+	BitBoard k_checkers = get_knight_move(king_square) & b.get_piece_board<!white, KNIGHT>();
+	BitBoard king_mask = square_to_mask(king_square);
+	BitBoard p_checkers =
+		(get_pawn_left<white>(can_capture_left(king_mask)) | get_pawn_right<white>(can_capture_right(king_mask)))
+		& b.get_piece_board<!white, PAWN>();
+	return k_checkers | p_checkers;
+}
+
+template <bool white>
+FORCE_INLINE MaskSet& create_masks(Board& b, Square king_square, BitBoard checker, MaskSet& ret) {
 	ret.reset();
 	ret.cmt = ~b.get_player_occ<white>();
 
@@ -40,16 +47,12 @@ MaskSet& create_masks(Board& b, Square king_square, MaskSet& ret) {
 	BitBoard eq = b.get_piece_board<!white, QUEEN>();
 	BitBoard eb = b.get_piece_board<!white, BISHOP>();
 	BitBoard er = b.get_piece_board<!white, ROOK>();
-	BitBoard diag_pinners = get_bishop_move(king_square, opp_board) & (eb | eq);
-	BitBoard orth_pinners = get_rook_move(king_square, opp_board) & (er | eq);
-	BitBoard k_checkers = get_knight_move(king_square) & b.get_piece_board<!white, KNIGHT>();
-	BitBoard p_checkers = get_pawn_diags<white>(square_to_mask(king_square)) & b.get_piece_board<!white, PAWN>();
+	BitBoard diag_pinners =
+		(bishop_rays[king_square] & (eb | eq)) ? get_bishop_move(king_square, opp_board) & (eb | eq) : 0;
+	BitBoard orth_pinners = (rook_rays[king_square] & (er | eq)) ? get_rook_move(king_square, opp_board) & (er | eq) : 0;
 
-	if (k_checkers) {
-		ret.check_mask |= k_checkers;
-		ret.checkers++;
-	} else if (p_checkers) {
-		ret.check_mask |= p_checkers;
+	if (checker) {
+		ret.check_mask |= checker;
 		ret.checkers++;
 	}
 
@@ -77,4 +80,3 @@ MaskSet& create_masks(Board& b, Square king_square, MaskSet& ret) {
 	return ret;
 }
 
-#endif

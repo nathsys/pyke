@@ -1,3 +1,5 @@
+#pragma once
+
 #include <immintrin.h>
 
 #include <array>
@@ -8,12 +10,9 @@
 #include "defaults.hpp"
 #include "util.hpp"
 
-#ifndef LOOKUPTABLES_H
-#define LOOKUPTABLES_H
-
 // Lookup tables for piece moves.
-// Bishop and rook tables are created below, these are made with a bit of help from "Chess Programming"'s youtube
-// videos.'
+// Bishop and rook tables are created below, these are made with a bit of help from "Chess Programming"'s YouTube
+// videos.
 constexpr uint64_t KING_MOVE_SQUARES[] = {
 	4665729213955833856ULL,
 	11592265440851656704ULL,
@@ -538,7 +537,7 @@ static std::array<BitBoard, rook_pext_size> init_rook_pext_atk() {
 }
 static const std::array<BitBoard, rook_pext_size> rook_pext_atk = init_rook_pext_atk();
 
-// En pessant squares.
+// En passant squares.
 static constexpr inline std::pair<Square, Square> ep_sqs_wl[8] =
 	{{0, 0}, {24, 17}, {25, 18}, {26, 19}, {27, 20}, {28, 21}, {29, 22}, {30, 23}};
 
@@ -551,4 +550,3 @@ static constexpr inline std::pair<Square, Square> ep_sqs_bl[8] =
 static constexpr inline std::pair<Square, Square> ep_sqs_br[8] =
 	{{33, 40}, {34, 41}, {35, 42}, {36, 43}, {37, 44}, {38, 45}, {39, 46}, {0, 0}};
 
-#endif

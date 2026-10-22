@@ -1,3 +1,4 @@
+#pragma once
 
 #include <immintrin.h>
 
@@ -5,10 +6,7 @@
 #include <iostream>
 #include <string>
 
-#include "move.hpp"
-
-#ifndef UTIL_H
-#define UTIL_H
+#include "defaults.hpp"
 
 inline std::string make_chess_notation(int index) {
 	// Convert column index (0-7) to letter (a-h)
@@ -24,10 +22,8 @@ inline uint8_t notation_to_square(std::string notation) {
 	return ((row * 8) + column);
 }
 
-// Returns the position of the least significant bit.
+// Returns the position of the most significant bit.
 inline uint8_t lbit(uint64_t n) { return __builtin_clzll(n); }
-
-inline constexpr uint8_t square_to_shamt(Square s) { return 63 - s; }
 
 inline constexpr uint64_t square_to_mask(Square s) { return 1ULL << (63 - s); }
 
@@ -45,10 +41,11 @@ inline BitBoard popextr(uint64_t& b) {
 	return index;
 }
 
-static inline void print_movecnt(Square start_square, Square end_square, uint64_t cnt) {
-	if (cnt)
-		std::cout << make_chess_notation(start_square) << make_chess_notation(end_square) << ": " << std::to_string(cnt)
-				  << '\n';
+static inline void print_movecnt(Square start_square, Square end_square, uint64_t cnt, Piece promo = EMPTY) {
+	if (!cnt) return;
+	std::string name = make_chess_notation(start_square) + make_chess_notation(end_square);
+	if (promo != EMPTY) name += "   rbnq"[promo];
+	std::cout << name << ": " << std::to_string(cnt) << '\n';
 }
 
 inline void print_bitboard(uint64_t bitboard) {
@@ -73,4 +70,3 @@ inline void print_bitboard(uint64_t bitboard) {
 
 inline BitBoard pext(BitBoard bits, BitBoard mask) { return _pext_u64(bits, mask); }
 
-#endif

@@ -1,12 +1,8 @@
-// Default boards.
-#include <array>
+#pragma once
+
 #include <cstdint>
-#include <unordered_map>
+#include <utility>
 
-#ifndef DEFAULTS_H
-#define DEFAULTS_H
-
-// 8 bits startsquare, 8 bits end square.
 typedef uint8_t Square;
 typedef uint8_t Piece;
 typedef uint64_t BitBoard;
@@ -40,12 +36,12 @@ constexpr uint64_t INIT_WHITE_PIECES = 0b000000000000000000000000000000000000000
 #define QUEEN_ORTH 8
 #define EMPTY	   0
 
-#define occb   b.occ_board
 #define popcnt __builtin_popcountll
 
-enum class PawnMoveType { ATTACKS, FORWARD, DOUBLE_FORWARD, NON_DOUBLE, ALL };
+#define FORCE_INLINE inline __attribute__((always_inline))
+#define NO_INLINE	 __attribute__((noinline))
 
-const std::unordered_map<Square, uint8_t> get_castle_code{{62, 0}, {58, 1}, {6, 2}, {2, 3}};
+enum class PawnMoveType { ATTACKS, FORWARD, DOUBLE_FORWARD, NON_DOUBLE, ALL };
 
 inline constexpr BitBoard promotion_to_squares = (0b1111'1111ULL) | (0b1111'1111ULL << 56);
 inline constexpr BitBoard pawn_start_w = INIT_PAWN_SQUARES & INIT_WHITE_PIECES;
@@ -57,10 +53,8 @@ inline constexpr uint8_t king_start_squares[4] = {60, 60, 4, 4};
 inline constexpr uint8_t rook_start_squares[4] = {63, 56, 7, 0};
 inline constexpr uint8_t king_end_squares[4] = {62, 58, 6, 2};
 inline constexpr uint8_t rook_end_squares[4] = {61, 59, 5, 3};
-inline constexpr uint8_t queenside_middle_squares[4] = {1, 57};
+inline constexpr uint8_t queenside_middle_squares[2] = {1, 57};
 
-inline constexpr std::array<Piece, 6> non_king_pieces = {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY};
-inline constexpr std::array<Piece, 7> pieces = {PAWN, KING, KNIGHT, BISHOP, ROOK, QUEEN, EMPTY};
 inline constexpr BitBoard no_edges = 0b0111'1110'0111'1110'0111'1110'0111'1110'0111'1110'0111'1110'0111'1110'0111'1110;
 
 #define bq_mask (0b0001)
@@ -68,7 +62,6 @@ inline constexpr BitBoard no_edges = 0b0111'1110'0111'1110'0111'1110'0111'1110'0
 #define wq_mask (0b0100)
 #define wk_mask (0b1000)
 
-#define can_capture_left(b)	 b & 0x7F7F7F7F7F7F7F7F
-#define can_capture_right(b) b & 0xFEFEFEFEFEFEFEFE
+#define can_capture_left(b)	 ((b) & 0x7F7F7F7F7F7F7F7FULL)
+#define can_capture_right(b) ((b) & 0xFEFEFEFEFEFEFEFEULL)
 
-#endif	// !DEFAULTS_H

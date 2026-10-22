@@ -1,21 +1,17 @@
-#include <cstddef>
+#pragma once
+
 #include <cstdint>
-#include <stdexcept>
 
 #include "board.hpp"
 #include "gamestate.hpp"
 #include "maskset.hpp"
-#include "move.hpp"
 #include "stack.hpp"
 
-#ifndef POSITION_H
-#define POSITION_H
-
 struct Position {
-	Position() {}
-
 	Board board;
-	uint8_t ep_flag;
+	uint8_t ep_flag = 0;
+	CastlingRights cr = 0b1111;
+	BitBoard checker = 0;
 	bool white_turn = true;
 	Stack<MaskSet> masks;
 	Square bksq = 4;
@@ -46,7 +42,7 @@ struct Position {
 
 	// Returns whether a square is under attack.
 	template <bool white>
-	inline bool is_attacked(Square square) {
+	FORCE_INLINE bool is_attacked(Square square) {
 		return (get_pawn_move<white, PawnMoveType::ATTACKS>(square, board.occ_board)
 				& board.get_piece_board<!white, PAWN>())
 			|| (get_knight_move(square) & board.get_piece_board<!white, KNIGHT>())
@@ -58,4 +54,3 @@ struct Position {
 	}
 };
 
-#endif

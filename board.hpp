@@ -1,10 +1,9 @@
+#pragma once
+
 #include <stdexcept>
 
 #include "defaults.hpp"
 #include "util.hpp"
-
-#ifndef BOARD_H
-#define BOARD_H
 
 struct Board {
 	BitBoard w_pawn = INIT_PAWN_SQUARES & INIT_WHITE_PIECES;
@@ -26,45 +25,14 @@ struct Board {
 
 	BitBoard occ_board = INIT_TOTAL_SQUARES;
 
-	bool is_equal(const Board& other) const {
-		return (w_pawn == other.w_pawn) && (w_king == other.w_king) && (w_rook == other.w_rook)
-			&& (w_bishop == other.w_bishop) && (w_knight == other.w_knight) && (w_queen == other.w_queen)
-			&& (b_pawn == other.b_pawn) && (b_king == other.b_king) && (b_rook == other.b_rook)
-			&& (b_bishop == other.b_bishop) && (b_knight == other.b_knight) && (b_queen == other.b_queen)
-			&& (w_board == other.w_board) && (b_board == other.b_board) && (occ_board == other.occ_board);
-	}
-
-	Board copy() const {
-		Board new_board;
-		new_board.w_pawn = w_pawn;
-		new_board.w_king = w_king;
-		new_board.w_rook = w_rook;
-		new_board.w_bishop = w_bishop;
-		new_board.w_knight = w_knight;
-		new_board.w_queen = w_queen;
-
-		new_board.b_pawn = b_pawn;
-		new_board.b_king = b_king;
-		new_board.b_rook = b_rook;
-		new_board.b_bishop = b_bishop;
-		new_board.b_knight = b_knight;
-		new_board.b_queen = b_queen;
-
-		new_board.w_board = w_board;
-		new_board.b_board = b_board;
-		new_board.occ_board = occ_board;
-
-		return new_board;
-	}
-
-	// Returns the player's occupacion board.
+	// Returns the player's occupancy board.
 	template <bool white>
 	inline BitBoard get_player_occ() {
 		return white ? w_board : b_board;
 	}
 
 	template <bool white, Piece p>
-	inline BitBoard* get_board_pointer() {
+	FORCE_INLINE BitBoard* get_board_pointer() {
 		switch (p) {
 		case PAWN:
 			return white ? &w_pawn : &b_pawn;
@@ -103,13 +71,13 @@ struct Board {
 
 	// Gets the board for a given color and piece.
 	template <bool white, Piece p>
-	inline BitBoard get_piece_board() {
+	FORCE_INLINE BitBoard get_piece_board() {
 		return *get_board_pointer<white, p>();
 	}
 
-	// Returns the piece on the square or EMPTY by defualt.
+	// Returns the piece on the square or EMPTY by default.
 	template <bool white>
-	inline Piece get_piece(Square square) {
+	FORCE_INLINE Piece get_piece(Square square) {
 		BitBoard mask = square_to_mask(square);
 		if (get_piece_board<white, PAWN>() & mask) return PAWN;
 		if (get_piece_board<white, KNIGHT>() & mask) return KNIGHT;
@@ -126,4 +94,3 @@ struct Board {
 	void print_board();
 };
 
-#endif

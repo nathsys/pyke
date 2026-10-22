@@ -1,4 +1,5 @@
-#include <cassert>
+#pragma once
+
 #include <cmath>
 #include <cstdint>
 #include <ctime>
@@ -12,22 +13,19 @@ static uint64_t perft_internal(Position& pos) {
 	uint64_t nodes;
 
 	if (pos.white_turn)
-		nodes = pyke::count_moves<true, depth, true, make_cr_flag(1, 1, 1, 1)>(pos);
+		nodes = pyke::count_moves<true, depth, true>(pos);
 	else
-		nodes = pyke::count_moves<false, depth, true, make_cr_flag(1, 1, 1, 1)>(pos);
+		nodes = pyke::count_moves<false, depth, true>(pos);
 
 	clock_t end = clock();
-	double time_cost = double(end - start) / CLOCKS_PER_SEC;
-	std::cout << "PERFT results: \nNodes evaluated: " << nodes << "\nTime cost: " << time_cost << '\n';
-	std::cout << std::round((nodes / 1000000)) / time_cost << " million nodes per second" << '\n';
-	std::cout << "================================================================================ \n";
+	double seconds = double(end - start) / CLOCKS_PER_SEC;
+	std::cout << "\nNodes: " << nodes << "\nTime:  " << seconds << " s\n";
+	std::cout << "Speed: " << std::round(nodes / seconds / 1e4) / 100 << " MNPS\n";
 	return nodes;
 }
 
 static uint64_t perft(Position& pos, int depth) {
 	switch (depth) {
-	case 0:
-		return 1;
 	case 1:
 		return perft_internal<1>(pos);
 	case 2:
@@ -49,7 +47,7 @@ static uint64_t perft(Position& pos, int depth) {
 	case 10:
 		return perft_internal<10>(pos);
 	default:
-		std::cout << "Depth above 10 not supported." << std::endl;
+		std::cout << "Depth must be between 1 and 10.\n";
 		return 0;
 	}
 }
