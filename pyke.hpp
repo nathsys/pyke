@@ -185,6 +185,12 @@ template <bool white, int depth, bool print_move>
 static FORCE_INLINE uint64_t generate_king_moves(BitBoard targets, Position& pos) {
 	Square ksq = pos.get_ksq<white>();
 	targets &= get_king_move(ksq);
+	if constexpr (depth <= 1 && !print_move) {
+		BitBoard occ = pos.board.occ_board ^ square_to_mask(ksq);
+		uint64_t ret = 0;
+		while (targets) ret += !pos.is_attacked<white>(pop(targets), occ);
+		return ret;
+	}
 	BitBoard captures = targets & pos.board.get_player_occ<!white>();
 	BitBoard non_captures = targets & ~captures;
 	uint64_t ret = 0;
@@ -413,6 +419,17 @@ static FORCE_INLINE uint64_t generate_sliders(Position& pos, MaskSet& masks) {
 	BitBoard pin_r = rooks & orth_not_dg;
 	BitBoard pin_q_orth = queens & orth_not_dg;
 
+#ifdef SETWISE_COUNT
+	if constexpr (depth <= 1 && !print_move) {
+		BitBoard knights = pos.piece_brd<white, KNIGHT>() & masks.nopin;
+		return generate_moves<white, BISHOP, depth, print_move>(pin_targets_diag, pin_b, pos)
+			+ generate_moves<white, QUEEN_DIAG, depth, print_move>(pin_targets_diag, pin_q_diag, pos)
+			+ generate_moves<white, QUEEN_ORTH, depth, print_move>(pin_targets_orth, pin_q_orth, pos)
+			+ generate_moves<white, ROOK, depth, print_move>(pin_targets_orth, pin_r, pos)
+			+ count_setwise(unp_r | unp_q, unp_b | unp_q, knights, ~pos.board.occ_board, masks.targets);
+	}
+#endif
+
 	// Pinned + unpinned.
 	return generate_moves<white, BISHOP, depth, print_move>(pin_targets_diag, pin_b, pos)
 		+ generate_moves<white, BISHOP, depth, print_move>(masks.targets, unp_b, pos)
@@ -430,6 +447,9 @@ static FORCE_INLINE uint64_t generate_sliders(Position& pos, MaskSet& masks) {
 // Count knight moves.
 template <bool white, int depth, bool print_move>
 static FORCE_INLINE NodeCount generate_knight(Position& pos, MaskSet& masks) {
+#ifdef SETWISE_COUNT
+	if constexpr (depth <= 1 && !print_move) return 0;
+#endif
 	BitBoard knights = pos.piece_brd<white, KNIGHT>() & masks.nopin;
 	return generate_moves<white, KNIGHT, depth, print_move>(masks.targets, knights, pos);
 }
@@ -449,7 +469,9 @@ NO_INLINE uint64_t count_moves(Position& pos) {
 		pos.checker = 0;
 
 		// Make masks.
-		MaskSet& masks = create_masks<white>(pos.board, pos.get_ksq<white>(), checker, pos.masks.go_next());
+		MaskSet local_masks;
+		MaskSet& slot = depth <= 1 ? local_masks : pos.masks.go_next();
+		MaskSet& masks = create_masks<white>(pos.board, pos.get_ksq<white>(), checker, slot);
 
 		// King moves can always be generated.
 		uint64_t ret = generate_king_moves<white, depth, print_move>(masks.targets, pos);
@@ -464,7 +486,7 @@ NO_INLINE uint64_t count_moves(Position& pos) {
 			masks.targets &= masks.check_mask;
 			break;
 		default:
-			pos.masks.point_prev();
+			if constexpr (depth > 1) pos.masks.point_prev();
 			return ret;
 		}
 
@@ -473,7 +495,7 @@ NO_INLINE uint64_t count_moves(Position& pos) {
 		ret += generate_pawn<white, depth, print_move>(pos, masks);
 		ret += generate_knight<white, depth, print_move>(pos, masks);
 		if constexpr (ep) ret += generate_ep_moves<white, depth, print_move>(pos, ep_flag);
-		pos.masks.point_prev();
+		if constexpr (depth > 1) pos.masks.point_prev();
 		return ret;
 	}
 }

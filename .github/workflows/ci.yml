@@ -38,3 +38,10 @@ jobs:
           EXPECTED=3195901860
           echo "Got $RESULT nodes, expected $EXPECTED"
           [ "$RESULT" -eq "$EXPECTED" ]
+
+      - name: perftcheck (about 140,000 positions, depths 1 to 4)
+        if: matrix.compiler == 'g++'
+        run: |
+          curl -sSL -o perftcheck https://github.com/Timmoth/grandchesstree/releases/download/perftcheck-0.3.0/perftcheck-linux-x64
+          chmod +x perftcheck
+          ./perftcheck --engine ./build/pyke --quiet --include-edge-cases

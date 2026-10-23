@@ -25,6 +25,12 @@ struct Board {
 
 	BitBoard occ_board = INIT_TOTAL_SQUARES;
 
+	void clear() {
+		w_pawn = w_king = w_rook = w_bishop = w_knight = w_queen = 0;
+		b_pawn = b_king = b_rook = b_bishop = b_knight = b_queen = 0;
+		w_board = b_board = occ_board = 0;
+	}
+
 	// Returns the player's occupancy board.
 	template <bool white>
 	inline BitBoard get_player_occ() {

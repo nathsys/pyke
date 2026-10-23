@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cctype>
 #include <cstdint>
+#include <sstream>
 #include <string>
 
 #include "defaults.hpp"
@@ -103,11 +105,8 @@ static FORCE_INLINE void unmake_ep_move(Board& b, BitBoard move, BitBoard captur
 	add_to_board<!white, PAWN>(b, capture_sq);
 }
 
-// Do pawn double forward move.
 template <bool white>
-static FORCE_INLINE bool pawn_double(Board& b, BitBoard move, BitBoard to, uint8_t& ep_flag) {
-	move_piece<white, PAWN>(b, move);
-
+static FORCE_INLINE uint8_t double_push_ep_flag(Board& b, BitBoard to) {
 	// pawn moved two forward, update en passant status.
 	bool left_is_opp_pawn = b.get_piece_board<!white, PAWN>() & (to << 1);
 	bool right_is_opp_pawn = b.get_piece_board<!white, PAWN>() & (to >> 1);
@@ -122,11 +121,19 @@ static FORCE_INLINE bool pawn_double(Board& b, BitBoard move, BitBoard to, uint8
 	bool possible_right = right_is_opp_pawn && !edge_right;
 
 	// Update flag.
-	ep_flag = 0;
+	uint8_t ep_flag = 0;
 	if (possible_left) set_en_passant(true, file, ep_flag);
 	if (possible_right) set_en_passant(false, file, ep_flag);
 
-	return possible_left || possible_right;
+	return ep_flag;
+}
+
+// Do pawn double forward move.
+template <bool white>
+static FORCE_INLINE bool pawn_double(Board& b, BitBoard move, BitBoard to, uint8_t& ep_flag) {
+	move_piece<white, PAWN>(b, move);
+	ep_flag = double_push_ep_flag<white>(b, to);
+	return ep_flag;
 }
 
 // Undo double pawn move.
@@ -211,6 +218,24 @@ static void move_piece(Square from, Square to, Board& b, bool white, Piece p) {
 	add_to_board(b, to, p, white);
 }
 
+static Piece piece_from_char(char c) {
+	switch (c) {
+	case 'p':
+		return PAWN;
+	case 'n':
+		return KNIGHT;
+	case 'b':
+		return BISHOP;
+	case 'r':
+		return ROOK;
+	case 'q':
+		return QUEEN;
+	case 'k':
+		return KING;
+	}
+	return EMPTY;
+}
+
 static void move_from_string(const std::string& m, Position& p) {
 	Square from = notation_to_square(m.substr(0, 2));
 	Square to = notation_to_square(m.substr(2, 2));
@@ -224,7 +249,7 @@ static void move_from_string(const std::string& m, Position& p) {
 	move_piece(from, to, p.board, white, moved);
 
 	if (m.size() > 4) {
-		Piece promo = m[4] == 'q' ? QUEEN : m[4] == 'r' ? ROOK : m[4] == 'b' ? BISHOP : KNIGHT;
+		Piece promo = piece_from_char(m[4]);
 		remove_from_board(p.board, to, PAWN, white);
 		add_to_board(p.board, to, promo, white);
 	}
@@ -241,8 +266,59 @@ static void move_from_string(const std::string& m, Position& p) {
 			p.set_ksq<false>(to);
 	}
 
+	p.ep_flag = 0;
+	if (moved == PAWN && (to == from + 16 || to + 16 == from))
+		p.ep_flag = white ? double_push_ep_flag<true>(p.board, square_to_mask(to))
+						  : double_push_ep_flag<false>(p.board, square_to_mask(to));
+
 	p.cr &= castle_mask[from] & castle_mask[to];
 	p.white_turn = !white;
 	p.checker = white ? pawn_knight_checkers<false>(p.board, p.get_ksq<false>())
 					  : pawn_knight_checkers<true>(p.board, p.get_ksq<true>());
+}
+
+static void set_fen(Position& p, const std::string& fen) {
+	std::istringstream in(fen);
+	std::string placement, side, castling, ep;
+	in >> placement >> side >> castling >> ep;
+
+	p.board.clear();
+	Square s = 0;
+	for (char c : placement) {
+		if (c == '/') continue;
+		if (std::isdigit(c)) {
+			s += c - '0';
+			continue;
+		}
+		bool white = std::isupper(c);
+		Piece piece = piece_from_char(std::tolower(c));
+		add_to_board(p.board, s, piece, white);
+		if (piece == KING) {
+			if (white)
+				p.set_ksq<true>(s);
+			else
+				p.set_ksq<false>(s);
+		}
+		s++;
+	}
+
+	p.white_turn = side != "b";
+	p.cr = 0;
+	for (char c : castling) {
+		if (c == 'K') p.cr |= wk_mask;
+		if (c == 'Q') p.cr |= wq_mask;
+		if (c == 'k') p.cr |= bk_mask;
+		if (c == 'q') p.cr |= bq_mask;
+	}
+
+	p.ep_flag = 0;
+	if (ep.size() == 2) {
+		Square target = notation_to_square(ep);
+		BitBoard pushed = square_to_mask(p.white_turn ? target + 8 : target - 8);
+		p.ep_flag = p.white_turn ? double_push_ep_flag<false>(p.board, pushed)
+								 : double_push_ep_flag<true>(p.board, pushed);
+	}
+
+	p.checker = p.white_turn ? pawn_knight_checkers<true>(p.board, p.get_ksq<true>())
+							 : pawn_knight_checkers<false>(p.board, p.get_ksq<false>());
 }

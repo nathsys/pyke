@@ -54,7 +54,7 @@ FORCE_INLINE MaskSet& create_masks(Board& b, Square king_square, BitBoard checke
 
 	if (checker) {
 		ret.check_mask |= checker;
-		ret.checkers++;
+		ret.checkers += popcnt(checker);
 	}
 
 	auto process_pinners = [&](BitBoard& pinboard, BitBoard& goal_mask) {

@@ -4,21 +4,39 @@
 
 Pyke is a chess move generator written in C++20. It's built for [perft](https://www.chessprogramming.org/Perft), which means counting every legal position reachable from a starting position up to a given depth. It's single-threaded, and almost all of the work happens at compile time.
 
-On a Ryzen 9 7900X it counts perft 7 from the start position (3,195,901,860 nodes) in about 1.7 seconds, which works out to roughly 1.9 billion nodes per second. Perft 8 (84,998,978,956 nodes) takes about 47 seconds.
+On a Ryzen 9 7900X it counts perft 7 from the start position (3,195,901,860 nodes) in about 1.3 seconds, which works out to roughly 2.4 billion nodes per second. Perft 8 (84,998,978,956 nodes) takes about 36 seconds.
 
-## How it works
+## Speed
 
-- The board is stored as bitboards, one 64-bit integer per piece type and color.
-- Sliding piece attacks come from lookup tables indexed with the BMI2 `pext` instruction.
-- Only legal moves are generated. Before generating moves, Pyke builds a check mask and pin masks for the side to move, so it never has to make a move just to see if it leaves the king in check. King moves and en passant are the exceptions.
-- The side to move, the remaining depth and en passant availability are template parameters. Each combination compiles into its own specialized function, so those branches disappear at runtime.
-- Castling rights are a 4-bit field. King moves, rook moves and captures AND it with a mask from a 64-entry table, which handles moved kings, moved rooks and captured rooks in one step.
-- At the last ply, moves are counted with `popcount` and never actually played.
-- Release builds use profile-guided optimization. CMake first builds an instrumented binary, runs it to collect a profile, and then rebuilds using that profile.
+- **Bitboards:** one 64-bit integer per piece type and color.
+- **Templates:** side to move, remaining depth and en passant are template parameters, so their branches are resolved at compile time.
+- **Forced inlining:** every helper is inlined; the only real calls are one per search node.
+- **Legal moves only:** check and pin masks filter out illegal moves up front; only king moves and en passant are tested after being made.
+- **PEXT:** sliding attacks come from tables indexed with the BMI2 `pext` instruction.
+- **No moves made at the last ply:** pawns are counted with shifts, king moves by testing target squares directly.
+- **Setwise AVX-512:** all sliders and knights are counted at once, eight directions per register. All rooks and queens are slid north together in one bitboard fill. Two of your own pieces can never reach the same square in the same direction, so one `popcount` of the result equals the sum of their individual move counts. A 512-bit register holds eight bitboards, so all eight directions are filled in parallel, and a second register does the eight knight jumps.
+- **Early outs:** pin detection, pinned pawns and promotions are skipped when they can't apply.
+- **Castling mask table:** one AND per move updates castling rights.
+- **PGO:** profile-guided optimization, trained with both colors to move at every depth.
+
+## Legality and edge cases
+
+Every node starts by building a `MaskSet` for the side to move (`create_masks` in `maskset.hpp`). Moves are then legal by construction: each piece's attack bitboard is ANDed with the right mask, and nothing has to be made and undone to check it.
+
+- **`targets`:** squares that are empty or hold an enemy piece, i.e. `~own`.
+- **Finding pins and sliding checks:** Pyke looks up rook and bishop attacks from the king square, with only the enemy pieces as blockers. The rays pass through Pyke's own pieces and stop at the first enemy piece. ANDing that with the enemy sliders of the right type gives every candidate pinner and checker. For each one, `between_squares[king][slider]` is the line from the king up to and including the slider, and `popcount(line & own)` decides what it is:
+  - **0:** it's a check, and the line is ORed into `check_mask`.
+  - **1:** it's a pin, and the line is ORed into `pinmask_dg` or `pinmask_orth`.
+  - **2 or more:** nothing.
+- **Knight and pawn checks:** are detected when the move is made, from the moved piece's attacks, and handed to the next node as a `checker` bitboard. It's ORed into `check_mask`, and `checkers` is increased by its `popcount`, so even a combined knight-and-pawn check counts as a double check.
+- **Check:** with one checker, `targets &= check_mask`, so every non-king move must capture the checker or block its line. With two or more, only king moves are generated.
+- **Pins:** `nopin = ~(pinmask_dg | pinmask_orth)`. Unpinned pieces use `targets` as is. A pinned bishop, or a queen pinned diagonally, moves within `targets & pinmask_dg`; a pinned rook, or a queen pinned orthogonally, within `targets & pinmask_orth`. Pinned knights are skipped. Pinned pawns get `targets & pinmask_dg & occupied` (captures along the diagonal only) or `targets & pinmask_orth & empty` (pushes along the file only).
+- **King moves:** the candidates are `king_attacks & targets`, without `check_mask`. Each one is tested with `is_attacked(square, occupied ^ king)`. Taking the king off the board lets sliders see through its old square, so it can't step back along a checking ray.
+- **En passant:** the flag is only set when an enemy pawn stands next to the pushed pawn. The capture empties two squares on one rank, and the captured pawn may have been shielding a diagonal, so the masks can't cover it. Pyke makes the capture and tests its own king with `is_attacked`.
 
 ## Building
 
-You need CMake 3.21+, a recent GCC or Clang, and an x86-64 CPU with BMI2.
+You need CMake 3.21+, a recent GCC or Clang, and an x86-64 CPU with BMI2. AVX-512 is used when the CPU has it.
 
 ```
 mkdir build
@@ -35,7 +53,7 @@ make release
 ./pyke [depth] [moves...]
 ```
 
-The depth defaults to 7 and can be anywhere from 1 to 10. You can also pass moves in coordinate notation, and they're played from the start position before counting starts. Castling is written as the king's move (`e1g1`) and promotions get the piece as a fifth letter (`e7e8q`).
+The depth can be anywhere from 1 to 10. You can also pass moves in coordinate notation, and they're played from the start position before counting starts. Castling is written as the king's move (`e1g1`) and promotions get the piece as a fifth letter (`e7e8q`).
 
 ```
 ./pyke 6
@@ -44,12 +62,12 @@ The depth defaults to 7 and can be anywhere from 1 to 10. You can also pass move
 
 The output lists the node count for each root move (a "divide"), followed by the total, the time and the speed.
 
+Run without arguments, Pyke speaks UCI, so tools that drive chess engines can use it. It supports `uci`, `isready`, `ucinewgame`, `position startpos|fen ... [moves ...]` and `go perft N`.
+
 ## Correctness
 
 Perft from the start position matches the published numbers up to depth 9 (2,439,530,234,167 nodes). Further depths have not been tested.
 
-`make check` builds and runs the tests: perft 1 to 6 from the start position, plus 13 positions reached through move sequences that cover castling, en passant, pins and promotions.
+Pyke also passes [perftcheck](https://grandchesstree.com/perftcheck) on its full corpus of about 140,000 positions, including its edge cases: all 561,641 cases at depths 1 to 4 and all 140,410 at depth 5.
 
-## Limitations
-
-- There's no FEN input yet. The search always starts from the initial position, with any moves you pass played first.
+`make check` builds and runs the tests: perft 1 to 6 from the start position, the standard test positions from the Chess Programming Wiki (Kiwipete and positions 3 to 6), and positions that cover castling, en passant, pins and promotions.

@@ -144,6 +144,53 @@ static FORCE_INLINE BitBoard make_reach_board(Square square, Board& b) {
 
 const static std::array<std::array<uint64_t, 64>, 64> between_squares = create_betweens();
 
+#if defined(__AVX512F__) && defined(__AVX512VPOPCNTDQ__)
+#define SETWISE_COUNT
+
+inline constexpr BitBoard file_a = 0x8080808080808080ULL;
+inline constexpr BitBoard file_b = 0x4040404040404040ULL;
+inline constexpr BitBoard file_g = 0x0202020202020202ULL;
+inline constexpr BitBoard file_h = 0x0101010101010101ULL;
+inline constexpr BitBoard rank_1 = 0x00000000000000FFULL;
+inline constexpr BitBoard rank_2 = 0x000000000000FF00ULL;
+inline constexpr BitBoard rank_7 = 0x00FF000000000000ULL;
+inline constexpr BitBoard rank_8 = 0xFF00000000000000ULL;
+
+static FORCE_INLINE uint64_t count_setwise(
+	BitBoard orth, BitBoard diag, BitBoard knights, BitBoard empty, BitBoard targets
+) {
+	const __m512i rot1 = _mm512_setr_epi64(8, 56, 63, 1, 7, 9, 55, 57);
+	const __m512i rot2 = _mm512_setr_epi64(16, 48, 62, 2, 14, 18, 46, 50);
+	const __m512i rot4 = _mm512_setr_epi64(32, 32, 60, 4, 28, 36, 28, 36);
+	const __m512i wrap = _mm512_setr_epi64(
+		~rank_1, ~rank_8, ~file_a, ~file_h,
+		~(file_a | rank_1), ~(file_h | rank_1), ~(file_a | rank_8), ~(file_h | rank_8)
+	);
+	const __m512i jumps = _mm512_setr_epi64(15, 17, 6, 10, 47, 49, 54, 58);
+	const __m512i jump_wrap = _mm512_setr_epi64(
+		~(file_a | rank_1 | rank_2), ~(file_h | rank_1 | rank_2),
+		~(file_a | file_b | rank_1), ~(file_g | file_h | rank_1),
+		~(file_a | rank_8 | rank_7), ~(file_h | rank_8 | rank_7),
+		~(file_a | file_b | rank_8), ~(file_g | file_h | rank_8)
+	);
+	const __m512i target_vec = _mm512_set1_epi64(targets);
+
+	__m512i gen = _mm512_mask_blend_epi64(0xF0, _mm512_set1_epi64(orth), _mm512_set1_epi64(diag));
+	__m512i pro = _mm512_and_si512(_mm512_set1_epi64(empty), wrap);
+	gen = _mm512_or_si512(gen, _mm512_and_si512(pro, _mm512_rolv_epi64(gen, rot1)));
+	pro = _mm512_and_si512(pro, _mm512_rolv_epi64(pro, rot1));
+	gen = _mm512_or_si512(gen, _mm512_and_si512(pro, _mm512_rolv_epi64(gen, rot2)));
+	pro = _mm512_and_si512(pro, _mm512_rolv_epi64(pro, rot2));
+	gen = _mm512_or_si512(gen, _mm512_and_si512(pro, _mm512_rolv_epi64(gen, rot4)));
+	__m512i slides = _mm512_and_si512(_mm512_rolv_epi64(gen, rot1), _mm512_and_si512(wrap, target_vec));
+
+	__m512i hops = _mm512_rolv_epi64(_mm512_set1_epi64(knights), jumps);
+	hops = _mm512_and_si512(hops, _mm512_and_si512(jump_wrap, target_vec));
+
+	return _mm512_reduce_add_epi64(_mm512_add_epi64(_mm512_popcnt_epi64(slides), _mm512_popcnt_epi64(hops)));
+}
+#endif
+
 static std::array<BitBoard, 64> make_rays(bool diag) {
 	std::array<BitBoard, 64> ret{};
 	for (int s = 0; s < 64; s++) ret[s] = diag ? get_bishop_move(s, 0) : get_rook_move(s, 0);

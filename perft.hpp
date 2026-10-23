@@ -7,12 +7,20 @@
 
 #include "pyke.hpp"
 
+template <bool white, int depth, bool print_move>
+static uint64_t count_side(Position& pos) {
+	return pos.ep_flag ? pyke::count_moves<white, depth, print_move, true>(pos)
+					   : pyke::count_moves<white, depth, print_move, false>(pos);
+}
+
 template <int depth, bool print_move>
 static uint64_t count_root(Position& pos) {
 	BitBoard checker = pos.checker;
-	uint64_t nodes = pos.white_turn ? pyke::count_moves<true, depth, print_move>(pos)
-									: pyke::count_moves<false, depth, print_move>(pos);
+	uint8_t ep_flag = pos.ep_flag;
+	uint64_t nodes =
+		pos.white_turn ? count_side<true, depth, print_move>(pos) : count_side<false, depth, print_move>(pos);
 	pos.checker = checker;
+	pos.ep_flag = ep_flag;
 	return nodes;
 }
 
@@ -44,7 +52,7 @@ static uint64_t count_nodes(Position& pos, int depth) {
 	}
 }
 
-static uint64_t perft(Position& pos, int depth) {
+inline uint64_t perft(Position& pos, int depth) {
 	clock_t start = clock();
 	uint64_t nodes = count_nodes<true>(pos, depth);
 	clock_t end = clock();
