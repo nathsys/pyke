@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Pyke: a single-threaded perft engine"
+type: software
+authors:
+  - family-names: "Mohanu"
+    given-names: "Nathanael"
+    orcid: "https://orcid.org/0009-0005-4198-1217"
+repository-code: "https://github.com/nathsys/pyke"
+abstract: "A single-threaded chess perft engine in C++20, tuned for throughput using templates, PEXT attack tables and AVX-512 counting."
+keywords:
+  - chess
+  - perft
+  - move generation
+  - C++20
+version: "1.0.0"
+date-released: "2026-10-24"
