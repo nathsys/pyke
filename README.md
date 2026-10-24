@@ -92,3 +92,5 @@ Perft from the start position matches the published numbers up to depth 10 (69,3
 Pyke also passes [perftcheck](https://grandchesstree.com/perftcheck) on its full corpus of about 140,000 positions, including its edge cases: all 561,641 cases at depths 1 to 4 and all 140,410 at depth 5. With hashing on, it passes all 561,641 cases at depths 1 to 4 as well.
 
 `make check` builds and runs the tests: perft 1 to 6 from the start position, the standard test positions from the Chess Programming Wiki (Kiwipete and positions 3 to 6), and positions that cover castling, en passant, pins and promotions. Every case runs twice, once without and once with hashing.
+
+Made by Nathanael Mohanu
