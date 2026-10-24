@@ -27,6 +27,24 @@ static FORCE_INLINE void mark_check(Position& pos, Square to) {
 }
 
 template <bool white, int depth>
+static FORCE_INLINE Hash tt_index_key(Position& pos) {
+	return pos.hash ^ zobrist::keys.depth[depth] ^ (white ? 0 : zobrist::keys.side_to_move);
+}
+
+template <bool white, int depth>
+static FORCE_INLINE void apply_hash(Position& pos, Hash delta) {
+	if constexpr (depth >= 3) {
+		pos.hash ^= delta;
+		if (pos.tt) __builtin_prefetch(&pos.tt[tt_index_key<!white, depth - 1>(pos) & pos.tt_mask]);
+	}
+}
+
+template <int depth>
+static FORCE_INLINE void undo_hash(Position& pos, Hash delta) {
+	if constexpr (depth >= 3) pos.hash ^= delta;
+}
+
+template <bool white, int depth>
 static FORCE_INLINE uint64_t count_with_rights(Position& pos, CastlingRights mask) {
 	CastlingRights cr = pos.cr;
 	pos.cr &= mask;
@@ -54,12 +72,21 @@ static FORCE_INLINE uint64_t generate_rook_moves(BitBoard targets, Square from, 
 			const Piece captured = pos.board.get_piece<!white>(to);
 			BitBoard to_mask = square_to_mask(to);
 
+			Hash delta = zobrist::piece_key<white, p>(from) ^ zobrist::piece_key<white, p>(to)
+				^ zobrist::piece_key<!white>(captured, to);
+
 			capture_move_wrapper<white, p>(pos.board, captured, move, to_mask);
+			apply_hash<white, depth>(pos, delta);
 			loc_ret += count_with_rights<white, depth>(pos, castle_mask[from] & castle_mask[to]);
+			undo_hash<depth>(pos, delta);
 			unmake_capture_wrapper<white, p>(pos.board, captured, move, to_mask);
 		} else {
+			Hash delta = zobrist::piece_key<white, p>(from) ^ zobrist::piece_key<white, p>(to);
+
 			plain_move<white, p>(pos.board, move);
+			apply_hash<white, depth>(pos, delta);
 			loc_ret += count_with_rights<white, depth>(pos, castle_mask[from]);
+			undo_hash<depth>(pos, delta);
 			unmake_plain_move<white, p>(pos.board, move);
 		}
 		if constexpr (print_move) print_movecnt(from, to, loc_ret);
@@ -86,10 +113,14 @@ static FORCE_INLINE uint64_t count_captures(BitBoard targets, Square from, Posit
 			const Piece captured = pos.board.get_piece<!white>(to);
 			BitBoard move = square_to_mask(from) | square_to_mask(to);
 			BitBoard to_mask = square_to_mask(to);
+			Hash delta = zobrist::piece_key<white, p>(from) ^ zobrist::piece_key<white, p>(to)
+				^ zobrist::piece_key<!white>(captured, to);
 
 			capture_move_wrapper<white, p>(pos.board, captured, move, to_mask);
 			mark_check<white, p, depth>(pos, to);
+			apply_hash<white, depth>(pos, delta);
 			loc_ret += count_with_rights<white, depth>(pos, castle_mask[to]);
+			undo_hash<depth>(pos, delta);
 			unmake_capture_wrapper<white, p>(pos.board, captured, move, to_mask);
 
 			if constexpr (print_move) print_movecnt(from, to, loc_ret);
@@ -110,10 +141,13 @@ static FORCE_INLINE uint64_t count_plain(BitBoard targets, Square from, Position
 			uint64_t loc_ret = 0;
 			Square to = pop(targets);
 			BitBoard move = square_to_mask(from) | square_to_mask(to);
+			Hash delta = zobrist::piece_key<white, p>(from) ^ zobrist::piece_key<white, p>(to);
 
 			plain_move<white, p>(pos.board, move);
 			mark_check<white, p, depth>(pos, to);
+			apply_hash<white, depth>(pos, delta);
 			loc_ret += count_moves<!white, depth - 1, false>(pos);
+			undo_hash<depth>(pos, delta);
 			unmake_plain_move<white, p>(pos.board, move);
 
 			if constexpr (print_move) print_movecnt(from, to, loc_ret);
@@ -170,9 +204,14 @@ static FORCE_INLINE uint64_t generate_castle_move(Position& pos) {
 		return 1;
 	} else {
 		constexpr uint8_t code = white ? (kingside ? 0 : 1) : (kingside ? 2 : 3);
+		constexpr Hash delta = zobrist::piece_key<white, KING>(ksq) ^ zobrist::piece_key<white, KING>(to)
+			^ zobrist::piece_key<white, ROOK>(rook_start_squares[code])
+			^ zobrist::piece_key<white, ROOK>(rook_end_squares[code]);
 		castle_move<white, code>(pos.board);
 		pos.set_ksq<white>(to);
+		apply_hash<white, depth>(pos, delta);
 		uint64_t ret = count_with_rights<white, depth>(pos, castle_mask[ksq]);
+		undo_hash<depth>(pos, delta);
 		unmake_castle_move<white, code>(pos.board);
 		pos.set_ksq<white>(ksq);
 		if constexpr (print_move) print_movecnt(ksq, to, ret);
@@ -198,10 +237,15 @@ static FORCE_INLINE uint64_t generate_king_moves(BitBoard targets, Position& pos
 		Square to = pop(non_captures);
 		uint64_t loc_ret = 0;
 		BitBoard move = square_to_mask(ksq) | square_to_mask(to);
+		Hash delta = zobrist::piece_key<white, KING>(ksq) ^ zobrist::piece_key<white, KING>(to);
 
 		plain_move<white, KING>(pos.board, move);
 		pos.set_ksq<white>(to);
-		if (!pos.is_attacked<white>(to)) loc_ret += count_with_rights<white, depth>(pos, castle_mask[ksq]);
+		if (!pos.is_attacked<white>(to)) {
+			apply_hash<white, depth>(pos, delta);
+			loc_ret += count_with_rights<white, depth>(pos, castle_mask[ksq]);
+			undo_hash<depth>(pos, delta);
+		}
 		unmake_plain_move<white, KING>(pos.board, move);
 
 		if constexpr (print_move) print_movecnt(ksq, to, loc_ret);
@@ -214,11 +258,16 @@ static FORCE_INLINE uint64_t generate_king_moves(BitBoard targets, Position& pos
 		Piece captured = pos.board.get_piece<!white>(to);
 		BitBoard move = square_to_mask(ksq) | square_to_mask(to);
 		BitBoard to_mask = square_to_mask(to);
+		Hash delta = zobrist::piece_key<white, KING>(ksq) ^ zobrist::piece_key<white, KING>(to)
+			^ zobrist::piece_key<!white>(captured, to);
 
 		capture_move_wrapper<white, KING>(pos.board, captured, move, to_mask);
 		pos.set_ksq<white>(to);
-		if (!pos.is_attacked<white>(to))
+		if (!pos.is_attacked<white>(to)) {
+			apply_hash<white, depth>(pos, delta);
 			loc_ret += count_with_rights<white, depth>(pos, castle_mask[ksq] & castle_mask[to]);
+			undo_hash<depth>(pos, delta);
+		}
 		unmake_capture_wrapper<white, KING>(pos.board, captured, move, to_mask);
 
 		if constexpr (print_move) print_movecnt(ksq, to, loc_ret);
@@ -240,13 +289,18 @@ static FORCE_INLINE uint64_t make_en_passant(Position& pos, uint8_t ep) {
 	uint64_t loc_ret;
 	sq_pair epsq = get_ep_squares<white, offset>(ep);
 	BitBoard move = square_to_mask(epsq.first) | square_to_mask(epsq.second);
-	BitBoard capture_sq = square_to_mask(white ? epsq.second + 8 : epsq.second - 8);
+	Square captured = white ? epsq.second + 8 : epsq.second - 8;
+	BitBoard capture_sq = square_to_mask(captured);
+	Hash delta = zobrist::piece_key<white, PAWN>(epsq.first) ^ zobrist::piece_key<white, PAWN>(epsq.second)
+		^ zobrist::piece_key<!white, PAWN>(captured);
 
 	ep_move<white>(pos.board, move, capture_sq);
 	loc_ret = 0;
 	if (!pos.is_attacked<white>(pos.get_ksq<white>())) {
 		mark_check<white, PAWN, depth>(pos, epsq.second);
+		apply_hash<white, depth>(pos, delta);
 		loc_ret = count_moves<!white, depth - 1, false>(pos);
+		undo_hash<depth>(pos, delta);
 	}
 
 	unmake_ep_move<white>(pos.board, move, capture_sq);
@@ -275,10 +329,13 @@ static FORCE_INLINE NodeCount generate_pawn_double(BitBoard targets, Position& p
 			while (to_board) {
 				BitBoard to = popextr(to_board);
 				BitBoard move = from | to;
+				Hash delta = zobrist::piece_key<white, PAWN>(lbit(from)) ^ zobrist::piece_key<white, PAWN>(lbit(to));
 				bool ep = pawn_double<white>(pos.board, move, to, pos.ep_flag);
 				mark_check<white, PAWN, depth>(pos, lbit(to));
+				apply_hash<white, depth>(pos, delta);
 				NodeCount loc_ret = ep ? count_moves<!white, depth - 1, false, true>(pos)
 									   : count_moves<!white, depth - 1, false, false>(pos);
+				undo_hash<depth>(pos, delta);
 				unmake_pawn_double<white>(pos.board, move);
 				if constexpr (print_move) print_movecnt(lbit(from), lbit(to), loc_ret);
 				ret += loc_ret;
@@ -327,8 +384,12 @@ static FORCE_INLINE uint64_t make_promotion(Position& pos, Square from, Square t
 		plain_move<white, PAWN>(pos.board, move);
 	toggle_promotion<white, promo>(pos.board, to_mask);
 	mark_check<white, promo, depth>(pos, to);
+	Hash delta = zobrist::piece_key<white, PAWN>(from) ^ zobrist::piece_key<white, promo>(to)
+		^ zobrist::piece_key<!white>(captured, to);
 
+	apply_hash<white, depth>(pos, delta);
 	uint64_t ret = count_with_rights<white, depth>(pos, castle_mask[to]);
+	undo_hash<depth>(pos, delta);
 
 	toggle_promotion<white, promo>(pos.board, to_mask);
 	if (captured != EMPTY)
@@ -458,12 +519,9 @@ static FORCE_INLINE NodeCount generate_knight(Position& pos, MaskSet& masks) {
  *	MAIN
  */
 
-// Main counting function.
 template <bool white, int depth, bool print_move, bool ep>
-NO_INLINE uint64_t count_moves(Position& pos) {
-	if constexpr (depth < 1)
-		return 1;
-	else {
+static FORCE_INLINE uint64_t count_node(Position& pos) {
+	{
 		uint8_t ep_flag = ep ? pos.ep_flag : 0;
 		BitBoard checker = pos.checker;
 		pos.checker = 0;
@@ -500,5 +558,36 @@ NO_INLINE uint64_t count_moves(Position& pos) {
 	}
 }
 
-}  // namespace pyke
+// Main counting function.
+template <bool white, int depth, bool print_move, bool ep>
+NO_INLINE uint64_t count_moves(Position& pos) {
+	if constexpr (depth < 1)
+		return 1;
+	else {
+		TTBucket* bucket = nullptr;
+		Hash key = 0;
+		if constexpr (depth >= 2 && !print_move) {
+			if (pos.tt) {
+				Hash index_key = tt_index_key<white, depth>(pos);
+				key = index_key ^ zobrist::keys.castling[pos.cr] ^ (ep ? zobrist::keys.en_passant[pos.ep_flag & 7] : 0);
+				bucket = &pos.tt[index_key & pos.tt_mask];
+				if (bucket->deep.key == key || bucket->recent.key == key) {
+					pos.checker = 0;
+					return bucket->deep.key == key ? bucket->deep.nodes() : bucket->recent.nodes();
+				}
+			}
+		}
 
+		uint64_t nodes = count_node<white, depth, print_move, ep>(pos);
+		if (bucket) {
+			TTEntry entry = {key, nodes | uint64_t(depth) << 56};
+			if (depth >= bucket->deep.depth())
+				bucket->deep = entry;
+			else
+				bucket->recent = entry;
+		}
+		return nodes;
+	}
+}
+
+}  // namespace pyke

@@ -17,6 +17,7 @@ template <int depth, bool print_move>
 static uint64_t count_root(Position& pos) {
 	BitBoard checker = pos.checker;
 	uint8_t ep_flag = pos.ep_flag;
+	pos.hash = zobrist::pieces(pos.board);
 	uint64_t nodes =
 		pos.white_turn ? count_side<true, depth, print_move>(pos) : count_side<false, depth, print_move>(pos);
 	pos.checker = checker;

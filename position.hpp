@@ -6,12 +6,16 @@
 #include "gamestate.hpp"
 #include "maskset.hpp"
 #include "stack.hpp"
+#include "zobrist.hpp"
 
 struct Position {
 	Board board;
 	uint8_t ep_flag = 0;
 	CastlingRights cr = 0b1111;
 	BitBoard checker = 0;
+	Hash hash = 0;
+	TTBucket* tt = nullptr;
+	Hash tt_mask = 0;
 	bool white_turn = true;
 	Stack<MaskSet> masks;
 	Square bksq = 4;

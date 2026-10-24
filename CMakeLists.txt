@@ -43,8 +43,10 @@ add_custom_target(debug
 	COMMENT "Building in Debug mode"
 )
 
-add_dependencies(generate pyke)
 add_custom_command(TARGET generate POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E rm -f
+		${CMAKE_BINARY_DIR}/CMakeFiles/pyke.dir/main.cpp.gcda
+		${CMAKE_BINARY_DIR}/CMakeFiles/pyke.dir/board.cpp.gcda
 	COMMAND ./pyke 6
 	COMMAND ./pyke 7
 	COMMENT "Generating profile data for profile-guided optimization"

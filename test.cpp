@@ -75,17 +75,19 @@ const std::vector<PerftCase> cases = {
 	{KNIGHT_PAWN_CHECK, {}, 4, 51084},
 };
 
-int main() {
+static int run_cases(TTBucket* tt, Hash tt_mask) {
 	int failed = 0;
 	for (const PerftCase& c : cases) {
 		Position pos;
+		pos.tt = tt;
+		pos.tt_mask = tt_mask;
 		set_fen(pos, c.fen);
 		for (const std::string& m : c.moves) move_from_string(m, pos);
 		uint64_t nodes = count_nodes<false>(pos, c.depth);
 
 		bool ok = nodes == c.expected;
 		if (!ok) failed++;
-		std::cout << (ok ? "ok   " : "FAIL ") << "depth " << c.depth << " ";
+		std::cout << (ok ? "ok   " : "FAIL ") << (tt ? "hashed " : "") << "depth " << c.depth << " ";
 		std::cout << (c.fen == START ? "start" : c.fen) << " [";
 		for (size_t i = 0; i < c.moves.size(); i++) std::cout << (i ? " " : "") << c.moves[i];
 		std::cout << "]: " << nodes;
@@ -93,6 +95,12 @@ int main() {
 		std::cout << '\n';
 	}
 
-	std::cout << cases.size() - failed << "/" << cases.size() << " passed\n";
+	std::cout << cases.size() - failed << "/" << cases.size() << (tt ? " passed with hashing\n" : " passed\n");
+	return failed;
+}
+
+int main() {
+	std::vector<TTBucket> table(1 << 21);
+	int failed = run_cases(nullptr, 0) + run_cases(table.data(), table.size() - 1);
 	return failed ? 1 : 0;
 }
