@@ -1,6 +1,7 @@
 # Pyke
 
 [![CI](https://github.com/nathsys/pyke/actions/workflows/ci.yml/badge.svg)](https://github.com/nathsys/pyke/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Pyke is a chess move generator written in C++20. It's built for [perft](https://www.chessprogramming.org/Perft), which means counting every legal position reachable from a starting position up to a given depth. It's single-threaded, and almost all of the work happens at compile time.
 
